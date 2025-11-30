@@ -1,0 +1,2378 @@
+# Home Dashboard Project Skeleton
+
+Complete project structure and all initial files for the Raspberry Pi home dashboard.
+
+---
+
+## Directory Structure
+
+```
+home-dashboard/
+├── api_app/
+│   ├── api_app/
+│   │   ├── __init__.py
+│   │   ├── main.py
+│   │   ├── config.py
+│   │   ├── models.py
+│   │   ├── routers/
+│   │   │   ├── __init__.py
+│   │   │   ├── weather.py
+│   │   │   ├── spotify.py
+│   │   │   ├── tv_tizen.py
+│   │   │   └── phone_ifttt.py
+│   │   └── services/
+│   │       ├── __init__.py
+│   │       ├── weather_service.py
+│   │       ├── spotify_service.py
+│   │       ├── tv_tizen_service.py
+│   │       └── phone_ifttt_service.py
+│   └── pyproject.toml
+├── ui_app/
+│   ├── ui_app/
+│   │   ├── __init__.py
+│   │   ├── app.py
+│   │   ├── config.py
+│   │   └── tiles/
+│   │       ├── __init__.py
+│   │       ├── weather.py
+│   │       ├── spotify.py
+│   │       ├── quick_actions.py
+│   │       ├── phone.py
+│   │       └── status.py
+│   └── pyproject.toml
+├── tests/
+│   ├── unit/
+│   │   ├── api_app/
+│   │   │   ├── test_weather_service.py
+│   │   │   ├── test_spotify_service.py
+│   │   │   ├── test_tv_tizen_service.py
+│   │   │   └── test_phone_ifttt_service.py
+│   │   └── ui_app/
+│   │       └── test_layout_basic.py
+│   ├── integration/
+│   │   ├── test_api_routes.py
+│   │   ├── test_wake_tv_and_play.py
+│   │   └── test_ifttt_flow.py
+│   ├── e2e/
+│   │   ├── test_streamlit_smoke.py
+│   │   └── test_docker_smoke.py
+│   └── conftest.py
+├── docker/
+│   ├── Dockerfile.api
+│   ├── Dockerfile.ui
+│   ├── start.sh
+│   └── docker-compose.yml
+├── infra/
+│   └── systemd/
+│       ├── kiosk-chromium.service
+│       └── docker-dashboard.service
+├── docs/
+│   ├── architecture.md
+│   ├── endpoints.md
+│   ├── tiles.md
+│   └── dev-notes.md
+├── .github/
+│   └── workflows/
+│       ├── ci.yml
+│       └── build-image.yml
+├── .env.example
+├── .gitignore
+├── README.md
+└── LICENSE
+```
+
+---
+
+## File Contents
+
+### Root Files
+
+#### `.gitignore`
+
+```
+# Environment
+.env
+.env.local
+*.pyc
+__pycache__/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Python
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore
+
+# Poetry
+poetry.lock
+```
+
+#### `.env.example`
+
+```
+# TV Configuration
+TV_IP=192.168.178.79
+TV_SPOTIFY_DEVICE_ID=your-tv-device-id-here
+
+# Weather API
+WEATHER_API_KEY=your-openweathermap-api-key-here
+WEATHER_LOCATION=Den Bosch
+WEATHER_LATITUDE=51.5
+WEATHER_LONGITUDE=5.3
+
+# Spotify API
+SPOTIFY_CLIENT_ID=your-spotify-client-id-here
+SPOTIFY_CLIENT_SECRET=your-spotify-client-secret-here
+SPOTIFY_REDIRECT_URI=http://localhost:8501/callback
+SPOTIFY_REFRESH_TOKEN=your-refresh-token-here
+
+# IFTTT
+IFTTT_WEBHOOK_KEY=your-ifttt-webhook-key-here
+IFTTT_EVENT_NAME=ring_jamie_phone
+
+# API Configuration
+API_BASE_URL=http://localhost:8000
+API_HOST=0.0.0.0
+API_PORT=8000
+
+# Streamlit Configuration
+STREAMLIT_HOST=0.0.0.0
+STREAMLIT_PORT=8501
+STREAMLIT_CLIENT_TOOLBARPOSITION=bottom
+```
+
+#### `README.md`
+
+```markdown
+# Home Dashboard
+
+A Raspberry Pi 5 home control dashboard with Streamlit UI and FastAPI backend. 
+Controls TV (Tizen), Spotify, weather, and phone notifications.
+
+## Features
+
+- **Weather Tile**: Current conditions, temperature, clothing recommendations
+- **Spotify Tile**: Play/pause, track info, wake TV and play
+- **Phone Tile**: Ring Jamie's phone via IFTTT webhook
+- **Quick Actions**: Placeholder for links (recipes, transit, calendar)
+- **Status Bar**: Last refresh timestamp
+
+## Architecture
+
+- **Backend**: FastAPI (Python) running on port 8000
+- **Frontend**: Streamlit UI on port 8501
+- **Infrastructure**: Docker containers, systemd services for kiosk mode
+- **Runtime**: Raspberry Pi 5 with 64-bit OS
+
+See [docs/architecture.md](docs/architecture.md) for detailed design.
+
+## Quick Start (Local Development)
+
+### Prerequisites
+
+- Python 3.9+
+- Poetry
+- Docker (optional, for full setup)
+
+### Setup
+
+1. Clone the repo:
+   \`\`\`bash
+   git clone https://github.com/your-username/home-dashboard.git
+   cd home-dashboard
+   \`\`\`
+
+2. Copy and fill environment:
+   \`\`\`bash
+   cp .env.example .env
+   # Edit .env with your actual API keys, TV IP, etc.
+   \`\`\`
+
+3. Install dependencies:
+   \`\`\`bash
+   cd api_app && poetry install
+   cd ../ui_app && poetry install
+   cd ..
+   \`\`\`
+
+4. Run tests:
+   \`\`\`bash
+   pytest
+   \`\`\`
+
+5. Start services locally (two terminals):
+   
+   Terminal 1 (FastAPI):
+   \`\`\`bash
+   cd api_app && poetry run uvicorn api_app.main:app --reload
+   \`\`\`
+   
+   Terminal 2 (Streamlit):
+   \`\`\`bash
+   cd ui_app && poetry run streamlit run ui_app/app.py
+   \`\`\`
+
+6. Open browser to `http://localhost:8501`
+
+## Raspberry Pi Deployment
+
+### First Boot Setup
+
+1. Flash Raspberry Pi OS 64-bit to microSD
+2. Enable SSH and Docker
+3. Clone repo to Pi
+4. Fill `.env` with real values (TV IP, API keys)
+5. Run Docker:
+   \`\`\`bash
+   docker compose up -d
+   \`\`\`
+
+6. Chromium kiosk will auto-start and display the dashboard
+
+### Systemd Services
+
+- `kiosk-chromium.service`: Starts Chromium in kiosk mode at boot
+- `docker-dashboard.service`: Manages Docker container lifecycle (optional)
+
+See [infra/systemd/](infra/systemd/) for configuration.
+
+## API Documentation
+
+See [docs/endpoints.md](docs/endpoints.md) for complete API routes.
+
+Quick reference:
+- `/api/health` - Health check
+- `/api/weather/current` - Current weather
+- `/api/spotify/*` - Spotify controls and info
+- `/api/tv/wake` - Wake TV
+- `/api/phone/ring` - Ring Jamie's phone
+
+## Development
+
+### Running Tests
+
+```bash
+# Unit tests only (fast)
+pytest tests/unit
+
+# All tests
+pytest
+
+# With coverage
+pytest --cov=api_app --cov=ui_app
+```
+
+### Adding a Feature
+
+See [docs/dev-notes.md](docs/dev-notes.md) for step-by-step guide.
+
+## Contributing
+
+This is a personal home project, but feel free to fork and customize!
+
+## License
+
+MIT (or your choice)
+```
+
+#### `LICENSE`
+
+```
+MIT License
+
+Copyright (c) 2025
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and substantial permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+---
+
+### API App Files
+
+#### `api_app/pyproject.toml`
+
+```toml
+[tool.poetry]
+name = "api-app"
+version = "0.1.0"
+description = "FastAPI backend for home dashboard"
+authors = ["Your Name <you@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+fastapi = "^0.104.0"
+uvicorn = {version = "^0.24.0", extras = ["standard"]}
+httpx = "^0.25.0"
+websockets = "^12.0"
+pydantic = "^2.0"
+pydantic-settings = "^2.0"
+python-dotenv = "^1.0"
+tizenws = "^0.1.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+pytest-asyncio = "^0.21.0"
+pytest-cov = "^4.1.0"
+ruff = "^0.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+```
+
+#### `api_app/api_app/__init__.py`
+
+```python
+"""Home Dashboard API App"""
+
+__version__ = "0.1.0"
+```
+
+#### `api_app/api_app/config.py`
+
+```python
+"""Configuration for API app, loaded from environment variables."""
+
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    """API configuration settings."""
+
+    # Server
+    api_host: str = "0.0.0.0"
+    api_port: int = 8000
+
+    # TV
+    tv_ip: str
+    tv_spotify_device_id: str
+
+    # Weather
+    weather_api_key: str
+    weather_location: str = "Den Bosch"
+    weather_latitude: float = 51.5
+    weather_longitude: float = 5.3
+
+    # Spotify
+    spotify_client_id: str
+    spotify_client_secret: str
+    spotify_redirect_uri: str = "http://localhost:8501/callback"
+    spotify_refresh_token: str = ""
+
+    # IFTTT
+    ifttt_webhook_key: str
+    ifttt_event_name: str = "ring_jamie_phone"
+
+    class Config:
+        env_file = ".env"
+        case_sensitive = False
+
+
+# Global settings instance
+settings = Settings()
+```
+
+#### `api_app/api_app/models.py`
+
+```python
+"""Pydantic models for request/response validation."""
+
+from pydantic import BaseModel
+from typing import Optional
+
+
+class HealthResponse(BaseModel):
+    """Health check response."""
+
+    status: str
+    version: str
+
+
+class WeatherResponse(BaseModel):
+    """Current weather response."""
+
+    temp: float
+    feels_like: float
+    condition: str
+    icon: str
+    location: str
+    recommendation: str
+
+
+class SpotifyStatus(BaseModel):
+    """Current Spotify playback status."""
+
+    is_playing: bool
+    track_name: Optional[str] = None
+    artist_name: Optional[str] = None
+    device_name: Optional[str] = None
+    progress_ms: Optional[int] = None
+    duration_ms: Optional[int] = None
+
+
+class SpotifyPlayRequest(BaseModel):
+    """Request to play a track or context."""
+
+    context_uri: Optional[str] = None
+    device_id: Optional[str] = None
+
+
+class ErrorResponse(BaseModel):
+    """Error response."""
+
+    detail: str
+    error_code: str
+
+
+class PhoneRingRequest(BaseModel):
+    """Request to ring phone."""
+
+    message: Optional[str] = None
+```
+
+#### `api_app/api_app/main.py`
+
+```python
+"""Main FastAPI application."""
+
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+
+from api_app import __version__
+from api_app.routers import weather, spotify, tv_tizen, phone_ifttt
+from api_app.models import HealthResponse
+
+app = FastAPI(
+    title="Home Dashboard API",
+    description="Control TV, Spotify, weather, and phone",
+    version=__version__,
+)
+
+# Include routers
+app.include_router(weather.router, prefix="/api/weather", tags=["weather"])
+app.include_router(spotify.router, prefix="/api/spotify", tags=["spotify"])
+app.include_router(tv_tizen.router, prefix="/api/tv", tags=["tv"])
+app.include_router(phone_ifttt.router, prefix="/api/phone", tags=["phone"])
+
+
+@app.get("/health", response_model=HealthResponse)
+async def health_check():
+    """Health check endpoint."""
+    return HealthResponse(status="ok", version=__version__)
+
+
+@app.get("/")
+async def root():
+    """Root endpoint."""
+    return {"message": "Home Dashboard API", "docs": "/docs"}
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request, exc):
+    """Handle general exceptions."""
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "error_code": "INTERNAL_ERROR"},
+    )
+```
+
+#### `api_app/api_app/routers/__init__.py`
+
+```python
+"""API routers."""
+```
+
+#### `api_app/api_app/routers/weather.py`
+
+```python
+"""Weather API routes."""
+
+from fastapi import APIRouter, HTTPException
+from api_app.services import weather_service
+from api_app.models import WeatherResponse
+
+router = APIRouter()
+
+
+@router.get("/current", response_model=WeatherResponse)
+async def get_current_weather():
+    """Get current weather."""
+    try:
+        weather = await weather_service.get_current_weather()
+        return weather
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Weather service error: {str(e)}")
+```
+
+#### `api_app/api_app/routers/spotify.py`
+
+```python
+"""Spotify API routes."""
+
+from fastapi import APIRouter, HTTPException
+from api_app.services import spotify_service
+from api_app.models import SpotifyStatus
+
+router = APIRouter()
+
+
+@router.get("/status", response_model=SpotifyStatus)
+async def get_spotify_status():
+    """Get current Spotify playback status."""
+    try:
+        status = await spotify_service.get_current_track()
+        return status
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Spotify error: {str(e)}")
+
+
+@router.post("/play")
+async def play():
+    """Resume playback."""
+    try:
+        await spotify_service.play()
+        return {"status": "playing"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Spotify error: {str(e)}")
+
+
+@router.post("/pause")
+async def pause():
+    """Pause playback."""
+    try:
+        await spotify_service.pause()
+        return {"status": "paused"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Spotify error: {str(e)}")
+
+
+@router.post("/next")
+async def next_track():
+    """Skip to next track."""
+    try:
+        await spotify_service.next_track()
+        return {"status": "skipped"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Spotify error: {str(e)}")
+
+
+@router.post("/previous")
+async def previous_track():
+    """Go to previous track."""
+    try:
+        await spotify_service.previous_track()
+        return {"status": "previous"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Spotify error: {str(e)}")
+
+
+@router.post("/wake-and-play")
+async def wake_tv_and_play():
+    """Wake TV and transfer current playback."""
+    try:
+        result = await spotify_service.wake_tv_and_play()
+        return {"status": "transferring", "detail": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Wake/Play error: {str(e)}")
+```
+
+#### `api_app/api_app/routers/tv_tizen.py`
+
+```python
+"""TV Tizen API routes."""
+
+from fastapi import APIRouter, HTTPException
+from api_app.services import tv_tizen_service
+
+router = APIRouter()
+
+
+@router.post("/wake")
+async def wake_tv():
+    """Wake TV by sending KEY_POWER."""
+    try:
+        result = await tv_tizen_service.wake()
+        return {"status": "wake_sent", "detail": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"TV error: {str(e)}")
+
+
+@router.get("/status")
+async def get_tv_status():
+    """Get TV power status (experimental)."""
+    try:
+        status = await tv_tizen_service.get_status()
+        return {"power_on": status}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"TV status error: {str(e)}")
+```
+
+#### `api_app/api_app/routers/phone_ifttt.py`
+
+```python
+"""Phone IFTTT API routes."""
+
+from fastapi import APIRouter, HTTPException
+from api_app.services import phone_ifttt_service
+from api_app.models import PhoneRingRequest
+
+router = APIRouter()
+
+
+@router.post("/ring")
+async def ring_phone(request: PhoneRingRequest = PhoneRingRequest()):
+    """Ring Jamie's phone via IFTTT webhook."""
+    try:
+        result = await phone_ifttt_service.ring_phone(request.message)
+        return {"status": "ring_sent", "detail": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Phone ring error: {str(e)}")
+```
+
+#### `api_app/api_app/services/__init__.py`
+
+```python
+"""API services."""
+```
+
+#### `api_app/api_app/services/weather_service.py`
+
+```python
+"""Weather service for OpenWeatherMap API."""
+
+import httpx
+from api_app.config import settings
+from api_app.models import WeatherResponse
+
+
+async def get_current_weather() -> WeatherResponse:
+    """
+    Fetch current weather from OpenWeatherMap API.
+    
+    Returns:
+        WeatherResponse with temperature, condition, icon, and recommendation.
+    
+    Raises:
+        Exception if API call fails.
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://api.openweathermap.org/data/2.5/weather",
+                params={
+                    "lat": settings.weather_latitude,
+                    "lon": settings.weather_longitude,
+                    "appid": settings.weather_api_key,
+                    "units": "metric",
+                },
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            temp = data["main"]["temp"]
+            feels_like = data["main"]["feels_like"]
+            condition = data["weather"][0]["main"]
+            icon = data["weather"][0]["icon"]
+            
+            # Simple recommendation logic
+            recommendation = _get_recommendation(temp, condition)
+            
+            return WeatherResponse(
+                temp=temp,
+                feels_like=feels_like,
+                condition=condition,
+                icon=icon,
+                location=settings.weather_location,
+                recommendation=recommendation,
+            )
+    except httpx.HTTPError as e:
+        raise Exception(f"Weather API error: {str(e)}")
+
+
+def _get_recommendation(temp: float, condition: str) -> str:
+    """
+    Simple rule-based weather recommendation.
+    
+    Args:
+        temp: Temperature in Celsius.
+        condition: Weather condition string.
+    
+    Returns:
+        Recommendation string.
+    """
+    if temp < 0:
+        return "❄️ Heavy winter gear"
+    elif temp < 5:
+        return "🧥 Warm coat + layers"
+    elif temp < 15:
+        return "🧢 Light jacket"
+    elif temp > 25:
+        return "☀️ Sunscreen + hat"
+    
+    if "rain" in condition.lower():
+        return "☔ Bring umbrella"
+    elif "cloud" in condition.lower():
+        return "☁️ Might get cool"
+    
+    return "👍 Nice weather!"
+```
+
+#### `api_app/api_app/services/spotify_service.py`
+
+```python
+"""Spotify Web API service."""
+
+import httpx
+from api_app.config import settings
+from api_app.models import SpotifyStatus
+from api_app.services import tv_tizen_service
+
+
+# In-memory token cache (for demo; use proper token refresh in production)
+_access_token = None
+
+
+async def _get_access_token() -> str:
+    """
+    Get Spotify access token using Client Credentials flow.
+    
+    In production, implement proper token refresh logic.
+    For now, assumes SPOTIFY_REFRESH_TOKEN is set in .env.
+    
+    Returns:
+        Access token string.
+    
+    Raises:
+        Exception if token fetch fails.
+    """
+    global _access_token
+    
+    if _access_token:
+        return _access_token
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://accounts.spotify.com/api/token",
+                auth=(settings.spotify_client_id, settings.spotify_client_secret),
+                data={"grant_type": "client_credentials"},
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+            _access_token = data["access_token"]
+            return _access_token
+    except httpx.HTTPError as e:
+        raise Exception(f"Spotify auth error: {str(e)}")
+
+
+async def get_current_track() -> SpotifyStatus:
+    """
+    Get currently playing track on Spotify.
+    
+    Returns:
+        SpotifyStatus with current track and playback info.
+    
+    Raises:
+        Exception if API call fails.
+    """
+    try:
+        token = await _get_access_token()
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://api.spotify.com/v1/me/player/currently-playing",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            data = response.json() or {}
+            
+            is_playing = data.get("is_playing", False)
+            item = data.get("item") or {}
+            device = data.get("device") or {}
+            
+            return SpotifyStatus(
+                is_playing=is_playing,
+                track_name=item.get("name"),
+                artist_name=item.get("artists", [{}])[0].get("name") if item else None,
+                device_name=device.get("name"),
+                progress_ms=data.get("progress_ms"),
+                duration_ms=item.get("duration_ms") if item else None,
+            )
+    except httpx.HTTPError as e:
+        raise Exception(f"Spotify current track error: {str(e)}")
+
+
+async def play() -> None:
+    """Resume playback on Spotify."""
+    try:
+        token = await _get_access_token()
+        async with httpx.AsyncClient() as client:
+            response = await client.put(
+                "https://api.spotify.com/v1/me/player/play",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=10.0,
+            )
+            response.raise_for_status()
+    except httpx.HTTPError as e:
+        raise Exception(f"Spotify play error: {str(e)}")
+
+
+async def pause() -> None:
+    """Pause playback on Spotify."""
+    try:
+        token = await _get_access_token()
+        async with httpx.AsyncClient() as client:
+            response = await client.put(
+                "https://api.spotify.com/v1/me/player/pause",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=10.0,
+            )
+            response.raise_for_status()
+    except httpx.HTTPError as e:
+        raise Exception(f"Spotify pause error: {str(e)}")
+
+
+async def next_track() -> None:
+    """Skip to next track."""
+    try:
+        token = await _get_access_token()
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.spotify.com/v1/me/player/next",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=10.0,
+            )
+            response.raise_for_status()
+    except httpx.HTTPError as e:
+        raise Exception(f"Spotify next error: {str(e)}")
+
+
+async def previous_track() -> None:
+    """Go to previous track."""
+    try:
+        token = await _get_access_token()
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.spotify.com/v1/me/player/previous",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=10.0,
+            )
+            response.raise_for_status()
+    except httpx.HTTPError as e:
+        raise Exception(f"Spotify previous error: {str(e)}")
+
+
+async def wake_tv_and_play() -> str:
+    """
+    Wake TV and transfer current playback to TV device.
+    
+    This combines:
+    1. Wake TV via Tizen (KEY_POWER).
+    2. Transfer Spotify playback to TV device.
+    
+    Returns:
+        Status message.
+    
+    Raises:
+        Exception if operation fails.
+    """
+    try:
+        # Wake TV first
+        await tv_tizen_service.wake()
+        
+        # Transfer playback to TV device
+        token = await _access_token()
+        async with httpx.AsyncClient() as client:
+            response = await client.put(
+                "https://api.spotify.com/v1/me/player",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"device_ids": [settings.tv_spotify_device_id], "play": True},
+                timeout=10.0,
+            )
+            response.raise_for_status()
+        
+        return "TV woken and playback transferred"
+    except Exception as e:
+        raise Exception(f"Wake and play error: {str(e)}")
+```
+
+#### `api_app/api_app/services/tv_tizen_service.py`
+
+```python
+"""Tizen WebSocket service for Samsung TV control."""
+
+import asyncio
+import json
+import websockets
+from api_app.config import settings
+
+
+# Simple in-memory state tracker
+_wake_failure_count = 0
+
+
+async def wake() -> str:
+    """
+    Send KEY_POWER to TV to wake it (toggle power).
+    
+    Uses WebSocket to Tizen TV API.
+    
+    Returns:
+        Status message.
+    
+    Raises:
+        Exception if connection fails.
+    """
+    global _wake_failure_count
+    
+    try:
+        # Connect to Tizen TV
+        ws_url = f"wss://{settings.tv_ip}:8002/api/v2/channels/samsung.remote.control?name=PythonRemote"
+        
+        async with websockets.connect(
+            ws_url,
+            ssl=False,  # Note: self-signed cert, so ssl=False for now
+            ping_interval=None,
+        ) as ws:
+            # Send handshake
+            handshake = {
+                "method": "ms.channel.connect",
+                "params": {
+                    "sessionId": "",
+                    "clientIp": "",
+                    "deviceName": "PythonDashboard",
+                },
+            }
+            await ws.send(json.dumps(handshake))
+            
+            # Wait for response
+            response = await ws.recv()
+            print(f"TV handshake response: {response}")
+            
+            # Send KEY_POWER
+            key_command = {
+                "method": "ms.remote.control",
+                "params": {
+                    "Cmd": "SendRemoteKey",
+                    "DataOfCmd": "KEY_POWER",
+                    "Option": "false",
+                },
+            }
+            await ws.send(json.dumps(key_command))
+            
+        _wake_failure_count = 0
+        return "KEY_POWER sent to TV"
+        
+    except Exception as e:
+        _wake_failure_count += 1
+        print(f"TV wake failed (attempt {_wake_failure_count}): {str(e)}")
+        
+        # Optional: escalate to phone notification after N failures
+        if _wake_failure_count >= 5:
+            print("TV wake failed 5+ times, consider escalating")
+        
+        raise Exception(f"Tizen wake error: {str(e)}")
+
+
+async def get_status() -> bool:
+    """
+    Get TV power status (experimental).
+    
+    Returns:
+        True if TV is on, False if off.
+    
+    Raises:
+        Exception if status check fails.
+    """
+    try:
+        # This is a placeholder; actual power state detection via Tizen is unreliable
+        # Try to connect as a simple test
+        ws_url = f"wss://{settings.tv_ip}:8002/api/v2/channels/samsung.remote.control?name=PythonRemote"
+        
+        async with websockets.connect(
+            ws_url,
+            ssl=False,
+            ping_interval=None,
+        ) as ws:
+            handshake = {
+                "method": "ms.channel.connect",
+                "params": {
+                    "sessionId": "",
+                    "clientIp": "",
+                    "deviceName": "PythonDashboard",
+                },
+            }
+            await ws.send(json.dumps(handshake))
+            response = await ws.recv()
+            
+            # If we got a response, assume TV is reachable (on or standby)
+            return True
+            
+    except Exception as e:
+        print(f"TV status check failed: {str(e)}")
+        return False
+```
+
+#### `api_app/api_app/services/phone_ifttt_service.py`
+
+```python
+"""IFTTT webhook service for phone notifications."""
+
+import httpx
+from api_app.config import settings
+
+
+async def ring_phone(message: str = None) -> str:
+    """
+    Trigger IFTTT webhook to ring Jamie's phone.
+    
+    Args:
+        message: Optional custom message (not used for basic ring, but for logging).
+    
+    Returns:
+        Status message.
+    
+    Raises:
+        Exception if webhook call fails.
+    """
+    try:
+        webhook_url = f"https://maker.ifttt.com/trigger/{settings.ifttt_event_name}/with/key/{settings.ifttt_webhook_key}"
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                webhook_url,
+                json={"value1": message or "Ring from home dashboard"},
+                timeout=10.0,
+            )
+            response.raise_for_status()
+        
+        return "Ring request sent to Jamie's phone"
+        
+    except httpx.HTTPError as e:
+        raise Exception(f"IFTTT webhook error: {str(e)}")
+```
+
+---
+
+### UI App Files
+
+#### `ui_app/pyproject.toml`
+
+```toml
+[tool.poetry]
+name = "ui-app"
+version = "0.1.0"
+description = "Streamlit UI for home dashboard"
+authors = ["Your Name <you@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+streamlit = "^1.30.0"
+httpx = "^0.25.0"
+python-dotenv = "^1.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+ruff = "^0.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+```
+
+#### `ui_app/ui_app/__init__.py`
+
+```python
+"""Home Dashboard UI App"""
+
+__version__ = "0.1.0"
+```
+
+#### `ui_app/ui_app/config.py`
+
+```python
+"""Configuration for UI app."""
+
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# API Configuration
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+
+# Streamlit Configuration
+STREAMLIT_THEME = "dark"
+REFRESH_INTERVAL = 10  # seconds
+```
+
+#### `ui_app/ui_app/app.py`
+
+```python
+"""Main Streamlit application."""
+
+import streamlit as st
+import asyncio
+from datetime import datetime
+from ui_app.config import API_BASE_URL
+from ui_app.tiles import weather, spotify, quick_actions, phone, status
+
+# Page configuration
+st.set_page_config(
+    page_title="Home Dashboard",
+    page_icon="🏠",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
+# Initialize session state
+if "last_refresh" not in st.session_state:
+    st.session_state.last_refresh = datetime.now()
+if "fullscreen_mode" not in st.session_state:
+    st.session_state.fullscreen_mode = None
+
+
+def main():
+    """Main dashboard layout."""
+    
+    st.title("🏠 Home Dashboard")
+    st.markdown("---")
+    
+    # Create columns for tiles
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("Weather")
+        try:
+            weather.render_tile(API_BASE_URL)
+        except Exception as e:
+            st.error(f"Weather tile error: {str(e)}")
+    
+    with col2:
+        st.subheader("Spotify")
+        try:
+            spotify.render_tile(API_BASE_URL)
+        except Exception as e:
+            st.error(f"Spotify tile error: {str(e)}")
+    
+    # Second row
+    col3, col4 = st.columns(2)
+    
+    with col3:
+        st.subheader("Phone")
+        try:
+            phone.render_tile(API_BASE_URL)
+        except Exception as e:
+            st.error(f"Phone tile error: {str(e)}")
+    
+    with col4:
+        st.subheader("Quick Actions")
+        try:
+            quick_actions.render_tile()
+        except Exception as e:
+            st.error(f"Quick actions error: {str(e)}")
+    
+    st.markdown("---")
+    status.render_status_bar()
+
+
+if __name__ == "__main__":
+    main()
+```
+
+#### `ui_app/ui_app/tiles/__init__.py`
+
+```python
+"""Streamlit tiles for dashboard."""
+```
+
+#### `ui_app/ui_app/tiles/weather.py`
+
+```python
+"""Weather tile for displaying current conditions."""
+
+import streamlit as st
+import httpx
+
+
+def render_tile(api_base_url: str):
+    """
+    Render weather tile with current conditions and recommendation.
+    
+    Args:
+        api_base_url: Base URL of FastAPI backend.
+    """
+    try:
+        response = httpx.get(f"{api_base_url}/api/weather/current", timeout=5.0)
+        response.raise_for_status()
+        data = response.json()
+        
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            st.metric("Temperature", f"{data['temp']:.1f}°C", f"Feels like {data['feels_like']:.1f}°C")
+        
+        with col2:
+            st.write(f"**Condition:** {data['condition']}")
+            st.write(f"**Location:** {data['location']}")
+            st.info(f"💡 {data['recommendation']}")
+            
+    except Exception as e:
+        st.error(f"Failed to load weather: {str(e)}")
+```
+
+#### `ui_app/ui_app/tiles/spotify.py`
+
+```python
+"""Spotify tile for playback control."""
+
+import streamlit as st
+import httpx
+
+
+def render_tile(api_base_url: str):
+    """
+    Render Spotify tile with playback controls and current track.
+    
+    Args:
+        api_base_url: Base URL of FastAPI backend.
+    """
+    try:
+        response = httpx.get(f"{api_base_url}/api/spotify/status", timeout=5.0)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Current track info
+        if data.get("track_name"):
+            st.write(f"**Now Playing:**")
+            st.write(f"🎵 {data['track_name']}")
+            if data.get("artist_name"):
+                st.write(f"👤 {data['artist_name']}")
+            if data.get("device_name"):
+                st.write(f"📱 {data['device_name']}")
+        else:
+            st.write("Nothing currently playing")
+        
+        # Playback controls
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            if st.button("⏮️ Previous", key="spotify_prev", use_container_width=True):
+                httpx.post(f"{api_base_url}/api/spotify/previous", timeout=5.0)
+                st.rerun()
+        
+        with col2:
+            if data.get("is_playing"):
+                if st.button("⏸️ Pause", key="spotify_pause", use_container_width=True):
+                    httpx.post(f"{api_base_url}/api/spotify/pause", timeout=5.0)
+                    st.rerun()
+            else:
+                if st.button("▶️ Play", key="spotify_play", use_container_width=True):
+                    httpx.post(f"{api_base_url}/api/spotify/play", timeout=5.0)
+                    st.rerun()
+        
+        with col3:
+            if st.button("⏭️ Next", key="spotify_next", use_container_width=True):
+                httpx.post(f"{api_base_url}/api/spotify/next", timeout=5.0)
+                st.rerun()
+        
+        with col4:
+            if st.button("🔇 Mute", key="spotify_mute", use_container_width=True):
+                st.info("Mute feature coming soon")
+        
+        # Wake TV & Play button
+        if st.button("📺 Wake TV & Play", key="wake_tv_play", use_container_width=True):
+            try:
+                httpx.post(f"{api_base_url}/api/tv/wake-and-play", timeout=10.0)
+                st.success("TV woken and playback transferred!")
+            except Exception as e:
+                st.error(f"Failed to wake TV: {str(e)}")
+        
+    except Exception as e:
+        st.error(f"Failed to load Spotify: {str(e)}")
+```
+
+#### `ui_app/ui_app/tiles/quick_actions.py`
+
+```python
+"""Quick actions tile for links and shortcuts."""
+
+import streamlit as st
+
+
+def render_tile():
+    """Render quick actions tile with placeholder links."""
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("🍳 Recipes", key="recipes", use_container_width=True):
+            st.info("Recipes link coming soon")
+    
+    with col2:
+        if st.button("🚌 Transit", key="transit", use_container_width=True):
+            st.info("Transit link coming soon")
+    
+    with col3:
+        if st.button("📅 Calendar", key="calendar", use_container_width=True):
+            st.info("Calendar link coming soon")
+```
+
+#### `ui_app/ui_app/tiles/phone.py`
+
+```python
+"""Phone tile for ringing Jamie's phone."""
+
+import streamlit as st
+import httpx
+
+
+def render_tile(api_base_url: str):
+    """
+    Render phone tile with button to ring Jamie.
+    
+    Args:
+        api_base_url: Base URL of FastAPI backend.
+    """
+    
+    if st.button("☎️ Ring Jamie's Phone", key="ring_phone", use_container_width=True):
+        try:
+            response = httpx.post(
+                f"{api_base_url}/api/phone/ring",
+                json={"message": "Ring from dashboard"},
+                timeout=5.0,
+            )
+            response.raise_for_status()
+            st.success("Ring request sent! 📱")
+        except Exception as e:
+            st.error(f"Failed to ring phone: {str(e)}")
+```
+
+#### `ui_app/ui_app/tiles/status.py`
+
+```python
+"""Status bar tile showing last refresh and system info."""
+
+import streamlit as st
+from datetime import datetime
+
+
+def render_status_bar():
+    """Render status bar with last refresh time."""
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.write(f"⏰ Last updated: {datetime.now().strftime('%H:%M:%S')}")
+    
+    with col2:
+        st.write("✅ All systems operational")
+    
+    with col3:
+        if st.button("🔄 Refresh", key="manual_refresh", use_container_width=True):
+            st.rerun()
+```
+
+#### `ui_app/ui_app/tiles/layout_basic.py`
+
+```python
+"""Basic layout helpers (for testing, not used in main app)."""
+
+
+def get_grid_layout(num_items: int, cols_per_row: int = 2):
+    """
+    Helper to calculate grid layout for tiles.
+    
+    Args:
+        num_items: Number of items to arrange.
+        cols_per_row: Number of columns per row.
+    
+    Returns:
+        List of column counts per row.
+    """
+    rows = (num_items + cols_per_row - 1) // cols_per_row
+    layout = [cols_per_row] * rows
+    
+    # Adjust last row if needed
+    remainder = num_items % cols_per_row
+    if remainder > 0:
+        layout[-1] = remainder
+    
+    return layout
+```
+
+---
+
+### Docker Files
+
+#### `docker/Dockerfile.api`
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install Poetry
+RUN pip install --no-cache-dir poetry
+
+# Copy API app
+COPY api_app /app/api_app
+
+# Install dependencies
+WORKDIR /app/api_app
+RUN poetry install --no-dev
+
+# Expose port
+EXPOSE 8000
+
+# Run FastAPI
+CMD ["poetry", "run", "uvicorn", "api_app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+#### `docker/Dockerfile.ui`
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install Poetry
+RUN pip install --no-cache-dir poetry
+
+# Copy UI app
+COPY ui_app /app/ui_app
+
+# Install dependencies
+WORKDIR /app/ui_app
+RUN poetry install --no-dev
+
+# Expose port
+EXPOSE 8501
+
+# Run Streamlit
+CMD ["poetry", "run", "streamlit", "run", "ui_app/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+```
+
+#### `docker/docker-compose.yml`
+
+```yaml
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    container_name: home-dashboard-api
+    ports:
+      - "8000:8000"
+    environment:
+      - TV_IP=${TV_IP}
+      - TV_SPOTIFY_DEVICE_ID=${TV_SPOTIFY_DEVICE_ID}
+      - WEATHER_API_KEY=${WEATHER_API_KEY}
+      - WEATHER_LOCATION=${WEATHER_LOCATION}
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
+      - SPOTIFY_REFRESH_TOKEN=${SPOTIFY_REFRESH_TOKEN}
+      - IFTTT_WEBHOOK_KEY=${IFTTT_WEBHOOK_KEY}
+    restart: unless-stopped
+    networks:
+      - dashboard
+
+  ui:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.ui
+    container_name: home-dashboard-ui
+    ports:
+      - "8501:8501"
+    environment:
+      - API_BASE_URL=http://api:8000
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - dashboard
+
+networks:
+  dashboard:
+    driver: bridge
+```
+
+#### `docker/start.sh`
+
+```bash
+#!/bin/bash
+
+# Start FastAPI in background
+cd /app/api_app
+poetry run uvicorn api_app.main:app --host 0.0.0.0 --port 8000 &
+
+# Start Streamlit (foreground)
+cd /app/ui_app
+poetry run streamlit run ui_app/app.py --server.port=8501 --server.address=0.0.0.0
+```
+
+---
+
+### Tests
+
+#### `tests/conftest.py`
+
+```python
+"""Pytest configuration and shared fixtures."""
+
+import pytest
+import httpx
+from fastapi.testclient import TestClient
+from unittest.mock import AsyncMock, patch
+
+# Import app
+import sys
+sys.path.insert(0, "api_app")
+from api_app.main import app as fastapi_app
+
+
+@pytest.fixture
+def test_client():
+    """FastAPI test client."""
+    return TestClient(fastapi_app)
+
+
+@pytest.fixture
+def mock_httpx():
+    """Mock httpx for external API calls."""
+    with patch("httpx.AsyncClient") as mock:
+        yield mock
+
+
+@pytest.fixture
+def mock_settings():
+    """Mock settings for tests."""
+    return {
+        "TV_IP": "192.168.178.79",
+        "TV_SPOTIFY_DEVICE_ID": "test-device-id",
+        "WEATHER_API_KEY": "test-key",
+        "SPOTIFY_CLIENT_ID": "test-id",
+        "SPOTIFY_CLIENT_SECRET": "test-secret",
+        "IFTTT_WEBHOOK_KEY": "test-webhook",
+    }
+```
+
+#### `tests/unit/api_app/test_weather_service.py`
+
+```python
+"""Unit tests for weather service."""
+
+import pytest
+from unittest.mock import AsyncMock, patch
+
+
+@pytest.mark.asyncio
+async def test_get_current_weather():
+    """Test weather service fetches current weather."""
+    # TODO: Implement test with mocked httpx
+    pass
+
+
+def test_weather_recommendation_logic():
+    """Test weather recommendation generation."""
+    from api_app.services.weather_service import _get_recommendation
+    
+    assert "jacket" in _get_recommendation(10, "cloudy").lower()
+    assert "umbrella" in _get_recommendation(15, "rain").lower()
+    assert "sunscreen" in _get_recommendation(28, "sunny").lower()
+```
+
+#### `tests/unit/api_app/test_spotify_service.py`
+
+```python
+"""Unit tests for Spotify service."""
+
+import pytest
+
+
+@pytest.mark.asyncio
+async def test_get_current_track():
+    """Test Spotify service fetches current track."""
+    # TODO: Implement test with mocked httpx
+    pass
+
+
+@pytest.mark.asyncio
+async def test_play():
+    """Test play command."""
+    # TODO: Implement test
+    pass
+```
+
+#### `tests/unit/api_app/test_tv_tizen_service.py`
+
+```python
+"""Unit tests for Tizen TV service."""
+
+import pytest
+
+
+@pytest.mark.asyncio
+async def test_wake_tv():
+    """Test TV wake command."""
+    # TODO: Implement test with mocked websockets
+    pass
+```
+
+#### `tests/unit/api_app/test_phone_ifttt_service.py`
+
+```python
+"""Unit tests for IFTTT phone service."""
+
+import pytest
+
+
+@pytest.mark.asyncio
+async def test_ring_phone():
+    """Test phone ring command."""
+    # TODO: Implement test with mocked httpx
+    pass
+```
+
+#### `tests/integration/test_api_routes.py`
+
+```python
+"""Integration tests for FastAPI routes."""
+
+import pytest
+
+
+def test_health_check(test_client):
+    """Test /health endpoint."""
+    response = test_client.get("/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+
+def test_weather_route(test_client):
+    """Test /api/weather/current route."""
+    # TODO: Implement with mocked weather service
+    pass
+
+
+def test_spotify_status_route(test_client):
+    """Test /api/spotify/status route."""
+    # TODO: Implement with mocked Spotify service
+    pass
+```
+
+---
+
+### Infrastructure
+
+#### `infra/systemd/kiosk-chromium.service`
+
+```ini
+[Unit]
+Description=Chromium Kiosk Mode for Home Dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+Environment="DISPLAY=:0"
+Environment="XAUTHORITY=/home/pi/.Xauthority"
+ExecStart=/usr/bin/chromium-browser --kiosk --noerrdialogs --disable-translate --no-first-run --fast --fast-start --disable-popup-blocking --disable-prompt-on-repost --disable-session-crashed-bubble --disable-infobars http://localhost:8501
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### `infra/systemd/docker-dashboard.service`
+
+```ini
+[Unit]
+Description=Home Dashboard Docker Container
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/pi/home-dashboard
+ExecStart=/usr/bin/docker-compose up
+ExecStop=/usr/bin/docker-compose down
+Restart=on-failure
+RestartSec=10
+User=pi
+
+[Install]
+WantedBy=multi-user.target
+```
+
+---
+
+### Documentation
+
+#### `docs/architecture.md`
+
+```markdown
+# Architecture
+
+## Overview
+
+Home Dashboard is a Raspberry Pi 5-based home control system with:
+- **Backend**: FastAPI serving REST API
+- **Frontend**: Streamlit web UI
+- **Hardware**: 5" touch display, USB microphone
+- **Runtime**: Docker containers on Raspberry Pi OS 64-bit
+
+## Components
+
+### Backend (FastAPI)
+
+Services for external integrations:
+- **Weather Service**: OpenWeatherMap API → weather tile
+- **Spotify Service**: Spotify Web API → playback control
+- **Tizen Service**: Samsung TV WebSocket → TV wake/control
+- **IFTTT Service**: Webhook calls → phone notifications
+
+### Frontend (Streamlit)
+
+Interactive tiles displayed on 5" touch display:
+- **Weather Tile**: Display current conditions + recommendation
+- **Spotify Tile**: Playback controls, track info, wake TV & play
+- **Phone Tile**: Fire-and-forget button to ring Jamie's phone
+- **Quick Actions**: Placeholder links (recipes, transit, calendar)
+- **Status Bar**: Last refresh timestamp
+
+### Infrastructure
+
+- **Docker Containers**: API and UI in separate containers via docker-compose
+- **Systemd Services**: Kiosk mode Chromium auto-start, container management
+- **Network**: Local LAN only (no cloud, no port forwarding needed)
+
+## Data Flow
+
+1. **User interacts with Streamlit UI** (tap button on 5" display)
+2. **UI calls FastAPI endpoint** (e.g., `/api/spotify/wake-and-play`)
+3. **FastAPI service** executes:
+   - Wake TV via Tizen WebSocket
+   - Transfer Spotify playback to TV device
+4. **Response returned to UI** (success/error toast)
+5. **UI refreshes** to show new state
+
+## Key Design Decisions
+
+- **Two containers**: Clean separation, independent restart/scaling
+- **Environment variables**: All secrets and config via .env (not in image)
+- **Mocked testing**: External API calls mocked in tests (fast, offline)
+- **No nginx**: Direct localhost routing in Phase 1 (add reverse proxy later if needed)
+- **Fire-and-forget IFTTT**: Async webhook calls, no confirmation needed
+- **Best-effort TV control**: Tizen WebSocket unreliable; handle gracefully
+
+## Future Enhancements
+
+- Spotify fullscreen mode with playlist browsing
+- TV power-state detection (experimental)
+- Multi-arch Docker image builds in CI
+- Nginx reverse proxy
+- Face recognition via camera
+- Error escalation (fail 5x → notify phone)
+```
+
+#### `docs/endpoints.md`
+
+```markdown
+# API Endpoints
+
+Base URL: `http://localhost:8000`
+
+## Health & Status
+
+### GET /health
+Health check endpoint.
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "version": "0.1.0"
+}
+```
+
+## Weather
+
+### GET /api/weather/current
+Get current weather conditions.
+
+**Response:**
+```json
+{
+  "temp": 12.5,
+  "feels_like": 11.2,
+  "condition": "Partly Cloudy",
+  "icon": "02d",
+  "location": "Den Bosch",
+  "recommendation": "Light jacket recommended"
+}
+```
+
+## Spotify
+
+### GET /api/spotify/status
+Get currently playing track and playback status.
+
+**Response:**
+```json
+{
+  "is_playing": true,
+  "track_name": "Song Title",
+  "artist_name": "Artist Name",
+  "device_name": "TV Woonkamer",
+  "progress_ms": 45000,
+  "duration_ms": 240000
+}
+```
+
+### POST /api/spotify/play
+Resume playback.
+
+**Response:**
+```json
+{
+  "status": "playing"
+}
+```
+
+### POST /api/spotify/pause
+Pause playback.
+
+**Response:**
+```json
+{
+  "status": "paused"
+}
+```
+
+### POST /api/spotify/next
+Skip to next track.
+
+**Response:**
+```json
+{
+  "status": "skipped"
+}
+```
+
+### POST /api/spotify/previous
+Go to previous track.
+
+**Response:**
+```json
+{
+  "status": "previous"
+}
+```
+
+### POST /api/spotify/wake-and-play
+Wake TV and transfer current playback to TV device.
+
+**Response:**
+```json
+{
+  "status": "transferring",
+  "detail": "TV woken and playback transferred"
+}
+```
+
+## TV (Tizen)
+
+### POST /api/tv/wake
+Send KEY_POWER to wake TV (toggle power).
+
+**Response:**
+```json
+{
+  "status": "wake_sent",
+  "detail": "KEY_POWER sent to TV"
+}
+```
+
+### GET /api/tv/status
+Get TV power status (experimental).
+
+**Response:**
+```json
+{
+  "power_on": true
+}
+```
+
+## Phone (IFTTT)
+
+### POST /api/phone/ring
+Ring Jamie's phone via IFTTT webhook.
+
+**Request:**
+```json
+{
+  "message": "Ring from dashboard"
+}
+```
+
+**Response:**
+```json
+{
+  "status": "ring_sent",
+  "detail": "Ring request sent to Jamie's phone"
+}
+```
+
+## Error Responses
+
+All errors return:
+```json
+{
+  "detail": "Error message",
+  "error_code": "ERROR_TYPE"
+}
+```
+
+HTTP Status Codes:
+- `200`: Success
+- `400`: Bad Request
+- `500`: Internal Server Error
+```
+
+#### `docs/tiles.md`
+
+```markdown
+# Tiles
+
+Dashboard display is composed of interactive tiles, each controlling a system.
+
+## Weather Tile
+
+**Display:**
+- Current temperature
+- Feels-like temperature
+- Condition icon
+- Location (Den Bosch)
+- One-line clothing/activity recommendation
+
+**Calls:**
+- GET /api/weather/current
+
+**Refresh:** Every 10–15 minutes (auto)
+
+**Assumptions:**
+- OpenWeatherMap API key is valid
+- Latitude/longitude are set correctly in config
+
+## Spotify Tile
+
+**Display (Compact):**
+- Currently playing track name
+- Artist name
+- Device name (e.g., "TV Woonkamer")
+- Play/Pause button
+- Previous / Next buttons
+- Mute button
+- "Wake TV & Play" button
+
+**Fullscreen Mode (Not in Phase 1):**
+- Browse playlists
+- Search for tracks/artists
+- Select moods/mixes
+- Transfer to TV and play
+
+**Calls:**
+- GET /api/spotify/status
+- POST /api/spotify/play
+- POST /api/spotify/pause
+- POST /api/spotify/next
+- POST /api/spotify/previous
+- POST /api/spotify/wake-and-play
+
+**Refresh:** On-demand (button press) + periodic polling
+
+**Assumptions:**
+- Spotify Premium account (required for device transfer)
+- TV is on same LAN and reachable
+- TV has Spotify app running (or will auto-launch after wake)
+
+## Phone Tile
+
+**Display:**
+- Large "Ring Jamie's Phone" button
+
+**Calls:**
+- POST /api/phone/ring
+
+**Behavior:**
+- Fire-and-forget (no confirmation)
+- Shows "Ring request sent!" toast on success
+
+**Assumptions:**
+- Jamie has IFTTT app installed on phone
+- IFTTT applet is set up for phone ring trigger
+- IFTTT webhook key is correct
+
+## Quick Actions Tile
+
+**Display:**
+- Buttons for shortcuts (Recipes, Transit, Calendar)
+
+**Calls:**
+- None (external links only)
+
+**Status:**
+- Placeholder in Phase 1
+
+## Status Bar
+
+**Display:**
+- Last refresh timestamp
+- System status indicator
+- Manual refresh button
+
+**Calls:**
+- None (client-side only)
+
+**Updates:**
+- On every tile refresh
+- On manual refresh button press
+```
+
+#### `docs/dev-notes.md`
+
+```markdown
+# Development Notes
+
+## Quick Setup
+
+1. Clone repo:
+   \`\`\`bash
+   git clone https://github.com/your-username/home-dashboard.git
+   cd home-dashboard
+   \`\`\`
+
+2. Set up environment:
+   \`\`\`bash
+   cp .env.example .env
+   # Edit .env with your values
+   \`\`\`
+
+3. Install dependencies:
+   \`\`\`bash
+   cd api_app && poetry install
+   cd ../ui_app && poetry install
+   cd ..
+   \`\`\`
+
+## Running Tests
+
+```bash
+# Unit tests (fast, offline)
+pytest tests/unit
+
+# Integration tests (may require mocks)
+pytest tests/integration
+
+# All tests
+pytest
+
+# With coverage
+pytest --cov=api_app --cov=ui_app
+```
+
+## Running Locally
+
+### Option 1: Bare Python (Two terminals)
+
+**Terminal 1 - FastAPI:**
+```bash
+cd api_app
+poetry run uvicorn api_app.main:app --reload
+```
+
+**Terminal 2 - Streamlit:**
+```bash
+cd ui_app
+poetry run streamlit run ui_app/app.py
+```
+
+Then open http://localhost:8501
+
+### Option 2: Docker (Single command)
+
+```bash
+docker compose -f docker/docker-compose.yml up
+```
+
+Then open http://localhost:8501
+
+## Adding a New Feature
+
+### Checklist
+
+1. **Define API contract** in `/api_app/api_app/models.py`
+   - Request/response Pydantic models
+
+2. **Implement service** in `/api_app/api_app/services/<feature>_service.py`
+   - Pure Python business logic
+   - Mock external APIs in tests
+
+3. **Add router** in `/api_app/api_app/routers/<feature>.py`
+   - HTTP endpoints
+   - Call service functions
+   - Handle errors → HTTP responses
+
+4. **Include router** in `/api_app/api_app/main.py`
+   - Add `app.include_router(...)` line
+
+5. **Write tests**
+   - Unit test in `tests/unit/api_app/test_<feature>_service.py`
+   - Integration test in `tests/integration/test_<feature>_routes.py`
+
+6. **Add UI tile** in `/ui_app/ui_app/tiles/<feature>.py`
+   - Call API endpoint
+   - Display results
+
+7. **Include tile** in `/ui_app/ui_app/app.py`
+   - Add column and render call
+
+8. **Update docs**
+   - Add endpoint to `docs/endpoints.md`
+   - Add tile info to `docs/tiles.md`
+
+### Example: Adding a new "Lights" feature
+
+```python
+# 1. models.py
+class LightStatus(BaseModel):
+    name: str
+    is_on: bool
+    brightness: int
+
+# 2. services/lights_service.py
+async def get_lights():
+    # Call external lights API
+    pass
+
+async def toggle_light(name: str):
+    # Send command
+    pass
+
+# 3. routers/lights.py
+@router.get("/lights", response_model=list[LightStatus])
+async def get_lights():
+    return await lights_service.get_lights()
+
+@router.post("/lights/{name}/toggle")
+async def toggle_light(name: str):
+    await lights_service.toggle_light(name)
+    return {"status": "toggled"}
+
+# 4. main.py
+app.include_router(lights.router, prefix="/api", tags=["lights"])
+
+# 5. tests/unit/api_app/test_lights_service.py
+@pytest.mark.asyncio
+async def test_get_lights():
+    # Mock and test
+    pass
+
+# 6. ui_app/tiles/lights.py
+def render_tile(api_base_url: str):
+    # Call API and render
+    pass
+
+# 7. ui_app/app.py
+with col_x:
+    st.subheader("Lights")
+    lights.render_tile(API_BASE_URL)
+
+# 8. docs/endpoints.md + docs/tiles.md
+# Add documentation
+```
+
+## Deployment to Raspberry Pi
+
+### One-Time Setup
+
+1. Flash Raspberry Pi OS 64-bit
+2. Enable SSH and Docker
+3. Clone repo:
+   \`\`\`bash
+   git clone https://github.com/your-username/home-dashboard.git ~/home-dashboard
+   cd ~/home-dashboard
+   \`\`\`
+
+4. Copy environment:
+   \`\`\`bash
+   cp .env.example .env
+   nano .env  # Edit with real values
+   \`\`\`
+
+5. Set up systemd services:
+   \`\`\`bash
+   sudo cp infra/systemd/*.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable kiosk-chromium docker-dashboard
+   \`\`\`
+
+### Deploy Updates
+
+```bash
+cd ~/home-dashboard
+git pull
+docker compose -f docker/docker-compose.yml build
+docker compose -f docker/docker-compose.yml up -d
+```
+
+## Debugging
+
+### View API logs
+```bash
+docker compose logs -f api
+```
+
+### View UI logs
+```bash
+docker compose logs -f ui
+```
+
+### SSH into API container
+```bash
+docker exec -it home-dashboard-api bash
+```
+
+### Check TV connectivity
+```bash
+python
+>>> import websockets
+>>> # Test WebSocket connection to TV
+```
+
+### Check Spotify API
+```bash
+curl -H "Authorization: Bearer <TOKEN>" https://api.spotify.com/v1/me/player
+```
+
+## Performance Tips
+
+- Keep service functions fast (external API calls are async)
+- Mock external APIs in tests
+- Use httpx with connection pooling for HTTP calls
+- Consider caching weather data (updates every 10 min anyway)
+
+## Code Quality
+
+```bash
+# Lint with ruff
+ruff check api_app ui_app
+
+# Format with ruff
+ruff format api_app ui_app
+
+# Type check (optional, requires mypy setup)
+mypy api_app
+```
+```
+
+---
+
+## Setup Instructions
+
+To use this skeleton:
+
+1. **Create directories:**
+   ```bash
+   mkdir -p home-dashboard/{api_app/api_app/{routers,services},ui_app/ui_app/tiles,tests/{unit/{api_app,ui_app},integration,e2e},docker,infra/systemd,docs,.github/workflows}
+   ```
+
+2. **Copy all files** from this markdown into their respective locations.
+
+3. **Initialize git and Poetry:**
+   ```bash
+   cd home-dashboard
+   git init
+   cd api_app && poetry install
+   cd ../ui_app && poetry install
+   cd ..
+   ```
+
+4. **Fill .env:**
+   ```bash
+   cp .env.example .env
+   nano .env  # Edit with real values
+   ```
+
+5. **Run tests:**
+   ```bash
+   pytest
+   ```
+
+6. **Start locally:**
+   ```bash
+   # Terminal 1
+   cd api_app && poetry run uvicorn api_app.main:app --reload
+   
+   # Terminal 2
+   cd ui_app && poetry run streamlit run ui_app/app.py
+   ```
+
+7. **Push to GitHub:**
+   ```bash
+   git add .
+   git commit -m "Initial skeleton"
+   git remote add origin https://github.com/your-username/home-dashboard.git
+   git branch -M main
+   git push -u origin main
+   ```
+
+---
+
+That's everything! You're ready to start building.

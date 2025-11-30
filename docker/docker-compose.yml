@@ -1,0 +1,41 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    container_name: home-dashboard-api
+    ports:
+      - "8000:8000"
+    environment:
+      - TV_IP=${TV_IP}
+      - TV_SPOTIFY_DEVICE_ID=${TV_SPOTIFY_DEVICE_ID}
+      - WEATHER_API_KEY=${WEATHER_API_KEY}
+      - WEATHER_LOCATION=${WEATHER_LOCATION}
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
+      - SPOTIFY_REFRESH_TOKEN=${SPOTIFY_REFRESH_TOKEN}
+      - IFTTT_WEBHOOK_KEY=${IFTTT_WEBHOOK_KEY}
+    restart: unless-stopped
+    networks:
+      - dashboard
+
+  ui:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.ui
+    container_name: home-dashboard-ui
+    ports:
+      - "8501:8501"
+    environment:
+      - API_BASE_URL=http://api:8000
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - dashboard
+
+networks:
+  dashboard:
+    driver: bridge

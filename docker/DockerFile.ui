@@ -1,0 +1,19 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install Poetry
+RUN pip install --no-cache-dir poetry
+
+# Copy UI app
+COPY ui_app /app/ui_app
+
+# Install dependencies
+WORKDIR /app/ui_app
+RUN poetry install --no-dev
+
+# Expose port
+EXPOSE 8501
+
+# Run Streamlit
+CMD ["poetry", "run", "streamlit", "run", "ui_app/app.py", "--server.port=8501", "--server.address=0.0.0.0"]

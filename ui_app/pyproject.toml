@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "ui-app"
+version = "0.1.0"
+description = "Streamlit UI for home dashboard"
+authors = ["Jelle Hilbrands <jelle.hilbrands@outlook.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+streamlit = "^1.30.0"
+httpx = "^0.25.0"
+python-dotenv = "^1.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+ruff = "^0.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
