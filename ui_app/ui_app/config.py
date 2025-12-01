@@ -1,13 +1,19 @@
-"""Configuration for UI app."""
+from pathlib import Path
+from pydantic_settings import BaseSettings
 
-import os
-from dotenv import load_dotenv
+BASE_DIR = Path(__file__).resolve().parents[2]  # home-dashboard/
 
-load_dotenv()
 
-# API Configuration
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+class UISettings(BaseSettings):
+    api_base_url: str = "http://localhost:8000"
+    streamlit_host: str = "0.0.0.0"
+    streamlit_port: int = 8501
+    refresh_interval: int = 10
 
-# Streamlit Configuration
-STREAMLIT_THEME = "dark"
-REFRESH_INTERVAL = 10  # seconds
+    class Config:
+        env_file = BASE_DIR / ".env"
+        case_sensitive = False
+        extra = "ignore"
+
+
+ui_settings = UISettings()

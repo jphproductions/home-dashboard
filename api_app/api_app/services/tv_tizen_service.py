@@ -1,6 +1,5 @@
 """Tizen WebSocket service for Samsung TV control."""
 
-import asyncio
 import json
 import websockets
 from api_app.config import settings

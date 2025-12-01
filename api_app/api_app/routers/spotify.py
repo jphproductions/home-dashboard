@@ -3,8 +3,7 @@
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from api_app.services import spotify_service
-from api_app.models import SpotifyStatus
-from api_app.dependencies import get_http_client
+from shared.models.spotify import SpotifyStatus
 
 router = APIRouter()
 

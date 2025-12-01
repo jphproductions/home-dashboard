@@ -1,84 +1,26 @@
-"""Weather service for OpenWeatherMap API."""
-
 import httpx
 from api_app.config import settings
-from api_app.models import WeatherResponse
+from shared.models.weather import CurrentWeather
 
 
-async def get_current_weather(client: httpx.AsyncClient) -> WeatherResponse:
-    """
-    Fetch current weather from OpenWeatherMap API.
+OPENWEATHER_URL = "https://api.openweathermap.org/data/2.5/weather"
 
-    Args:
-        client: Shared HTTP client from dependency injection.
 
-    Returns:
-        WeatherResponse with temperature, condition, icon, and recommendation.
+async def get_current_weather() -> CurrentWeather:
+    params = {
+        "lat": settings.weather_latitude,
+        "lon": settings.weather_longitude,
+        "appid": settings.weather_api_key,
+        "exclude": "minutely,hourly,daily,alerts",
+        "units": "metric",
+        "lang": "en",
+    }
 
-    Raises:
-        Exception if API call fails.
-    """
-    try:
-        response = await client.get(
-            "https://api.openweathermap.org/data/2.5/weather",
-            params={
-                "lat": settings.weather_latitude,
-                "lon": settings.weather_longitude,
-                "appid": settings.weather_api_key,
-                "units": "metric",
-            },
-            timeout=10.0,
-        )
+    async with httpx.AsyncClient() as client:
+        response = await client.get(OPENWEATHER_URL, params=params, timeout=10.0)
         response.raise_for_status()
         data = response.json()
 
-        temp = data["main"]["temp"]
-        feels_like = data["main"]["feels_like"]
-        condition = data["weather"][0]["main"]
-        icon = data["weather"][0]["icon"]
-
-        # Simple recommendation logic
-        recommendation = _get_recommendation(temp, condition)
-
-        return WeatherResponse(
-            temp=temp,
-            feels_like=feels_like,
-            condition=condition,
-            icon=icon,
-            location=settings.weather_location,
-            recommendation=recommendation,
-        )
-    except httpx.HTTPError as e:
-        # Always re-raise to allow proper error handling up the stack
-        raise Exception(f"Weather API error: {str(e)}") from e
-    except (KeyError, IndexError) as e:
-        # Handle malformed API responses
-        raise Exception(f"Invalid weather API response: {str(e)}") from e
-
-
-def _get_recommendation(temp: float, condition: str) -> str:
-    """
-    Simple rule-based weather recommendation.
-
-    Args:
-        temp: Temperature in Celsius.
-        condition: Weather condition string.
-
-    Returns:
-        Recommendation string.
-    """
-    if temp < 0:
-        return "❄️ Heavy winter gear"
-    elif temp < 5:
-        return "🧥 Warm coat + layers"
-    elif temp < 15:
-        return "🧢 Light jacket"
-    elif temp > 25:
-        return "☀️ Sunscreen + hat"
-
-    if "rain" in condition.lower():
-        return "☔ Bring umbrella"
-    elif "cloud" in condition.lower():
-        return "☁️ Might get cool"
-
-    return "👍 Nice weather!"
+    # Validate and parse into Pydantic model (auto-validates)
+    current_weather = CurrentWeather.model_validate(data)
+    return current_weather

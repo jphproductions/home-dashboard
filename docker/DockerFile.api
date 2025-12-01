@@ -8,6 +8,9 @@ RUN pip install --no-cache-dir poetry
 # Copy API app
 COPY api_app /app/api_app
 
+COPY shared /app/shared
+RUN pip install ./shared
+
 # Install dependencies
 WORKDIR /app/api_app
 RUN poetry install --no-dev

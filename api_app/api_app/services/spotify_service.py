@@ -2,7 +2,7 @@
 
 import httpx
 from api_app.config import settings
-from api_app.models import SpotifyStatus
+from shared.models import SpotifyStatus
 from api_app.services import tv_tizen_service
 
 

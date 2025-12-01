@@ -3,13 +3,12 @@
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from api_app.services import weather_service
-from api_app.models import WeatherResponse
-from api_app.dependencies import get_http_client
+from shared.models import CurrentWeather
 
 router = APIRouter()
 
 
-@router.get("/current", response_model=WeatherResponse)
+@router.get("/current", response_model=CurrentWeather)
 async def get_current_weather(client: httpx.AsyncClient = Depends(get_http_client)):
     """Get current weather."""
     try:

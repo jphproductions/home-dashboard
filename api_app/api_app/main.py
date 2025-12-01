@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 
 from api_app import __version__
 from api_app.routers import weather, spotify, tv_tizen, phone_ifttt
-from api_app.models import HealthResponse
+from shared.models import HealthResponse
 
 # Global HTTP client for connection pooling
 http_client: httpx.AsyncClient | None = None
