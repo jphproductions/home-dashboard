@@ -27,8 +27,15 @@
 # Unit tests (fast, offline)
 pytest tests/unit
 
+# Modern unit tests with AsyncMock
+pytest tests/unit/api_app/test_weather_service_modern.py -v
+pytest tests/unit/api_app/test_spotify_service_modern.py -v
+
 # Integration tests (may require mocks)
 pytest tests/integration
+
+# Modern integration tests with dependency injection
+pytest tests/integration/test_api_routes_modern.py -v
 
 # All tests
 pytest
@@ -72,11 +79,15 @@ Then open http://localhost:8501
 
 2. **Implement service** in `/api_app/api_app/services/<feature>_service.py`
    - Pure Python business logic
-   - Mock external APIs in tests
+   - Accept `httpx.AsyncClient` as first parameter
+   - Use exception chaining: `raise CustomError(...) from e`
+   - Add try/finally for resource cleanup (WebSockets, files, etc.)
+   - Mock external APIs in tests with `AsyncMock`
 
 3. **Add router** in `/api_app/api_app/routers/<feature>.py`
    - HTTP endpoints
-   - Call service functions
+   - Inject HTTP client: `client: httpx.AsyncClient = Depends(get_http_client)`
+   - Call service functions with injected client
    - Handle errors → HTTP responses
 
 4. **Include router** in `/api_app/api_app/main.py`
@@ -87,7 +98,11 @@ Then open http://localhost:8501
    - Integration test in `tests/integration/test_<feature>_routes.py`
 
 6. **Add UI tile** in `/ui_app/ui_app/tiles/<feature>.py`
-   - Call API endpoint
+   - Create cached fetch function: `@st.cache_data(ttl=...)`
+   - Create callback functions for actions (avoid `st.rerun()`)
+   - Use `st.status()` containers for long operations
+   - Clear cache after state-changing operations
+   - Call API endpoint with proper error handling
    - Display results
 
 7. **Include tile** in `/ui_app/ui_app/app.py`

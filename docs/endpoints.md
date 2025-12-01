@@ -2,6 +2,26 @@
 
 Base URL: `http://localhost:8000`
 
+## Implementation Notes (2025 Standards)
+
+**All endpoints follow these modern patterns:**
+
+- **HTTP Client Injection**: Routes use `Depends(get_http_client)` to receive shared `httpx.AsyncClient`
+- **Connection Pooling**: Single client with `max_keepalive=5`, `max_connections=10` reused across requests
+- **Error Handling**: Exception chaining with `raise ... from e` preserves stack traces
+- **Resource Cleanup**: WebSocket connections use try/finally to guarantee cleanup
+- **Type Safety**: Pydantic v2 models with proper Optional type hints
+
+**Example Route Pattern:**
+```python
+@router.post("/action")
+async def perform_action(
+    client: httpx.AsyncClient = Depends(get_http_client)
+):
+    result = await service_function(client)
+    return result
+```
+
 ## Health & Status
 
 ### GET /health

@@ -14,7 +14,13 @@ Dashboard display is composed of interactive tiles, each controlling a system.
 **Calls:**
 - GET /api/weather/current
 
-**Refresh:** Every 10–15 minutes (auto)
+**Refresh:** Every 10 minutes (cached with `@st.cache_data(ttl=600)`)
+
+**Implementation (2025):**
+- `fetch_weather_data()` cached function prevents excessive API calls
+- Status container shows "Fetching weather data..." during load
+- Cache automatically expires after 10 minutes
+- Error handling with proper exception messages
 
 **Assumptions:**
 - OpenWeatherMap API key is valid
@@ -45,7 +51,14 @@ Dashboard display is composed of interactive tiles, each controlling a system.
 - POST /api/spotify/previous
 - POST /api/spotify/wake-and-play
 
-**Refresh:** On-demand (button press) + periodic polling
+**Refresh:** On-demand (button press) + 5-second cache for status
+
+**Implementation (2025):**
+- `fetch_spotify_status()` cached for 5 seconds (`@st.cache_data(ttl=5)`)
+- All buttons use `on_click=spotify_action` callback (no manual `st.rerun()`)
+- Cache cleared after actions: `st.cache_data.clear()` ensures fresh data
+- Status container shows feedback during wake-and-play operation
+- Button parameters passed via `args=("play",)` pattern
 
 **Assumptions:**
 - Spotify Premium account (required for device transfer)
