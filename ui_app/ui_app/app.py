@@ -16,9 +16,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Debug: Show API URL being used
-print(f"[DEBUG] Using API_BASE_URL: {API_BASE_URL}")
-
 # Initialize session state
 if "last_refresh" not in st.session_state:
     st.session_state.last_refresh = datetime.now()

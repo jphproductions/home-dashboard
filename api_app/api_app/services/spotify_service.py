@@ -1,21 +1,50 @@
 """Spotify Web API service."""
 
 import httpx
+import time
+from pathlib import Path
 from api_app.config import settings
 from shared.models import SpotifyStatus
 from api_app.services import tv_tizen_service
 
 
-# In-memory token cache (for demo; use proper token refresh in production)
+# Token cache with expiration tracking
 _access_token = None
+_token_expires_at = 0
+
+# Path to store refresh token persistently
+TOKEN_FILE = Path.home() / ".spotify_refresh_token"
+
+
+def _load_refresh_token() -> str | None:
+    """Load refresh token from file."""
+    if TOKEN_FILE.exists():
+        try:
+            return TOKEN_FILE.read_text().strip()
+        except Exception:
+            return None
+    return None
+
+
+def _save_refresh_token(refresh_token: str) -> None:
+    """Save refresh token to file."""
+    try:
+        TOKEN_FILE.write_text(refresh_token)
+        TOKEN_FILE.chmod(0o600)  # Secure file permissions
+    except Exception as e:
+        raise Exception(f"Failed to save refresh token: {str(e)}") from e
+
+
+def is_authenticated() -> bool:
+    """Check if we have a refresh token available."""
+    return _load_refresh_token() is not None or bool(settings.spotify_refresh_token)
 
 
 async def _get_access_token(client: httpx.AsyncClient) -> str:
     """
-    Get Spotify access token using Client Credentials flow.
+    Get Spotify access token using refresh token flow.
 
-    In production, implement proper token refresh logic.
-    For now, assumes SPOTIFY_REFRESH_TOKEN is set in .env.
+    Automatically refreshes the token when expired.
 
     Args:
         client: Shared HTTP client from dependency injection.
@@ -24,23 +53,36 @@ async def _get_access_token(client: httpx.AsyncClient) -> str:
         Access token string.
 
     Raises:
-        Exception if token fetch fails.
+        Exception if token fetch/refresh fails.
     """
-    global _access_token
+    global _access_token, _token_expires_at
 
-    if _access_token:
+    # Return cached token if still valid (with 60s buffer)
+    if _access_token and time.time() < (_token_expires_at - 60):
         return _access_token
+
+    # Get refresh token from file or settings
+    refresh_token = _load_refresh_token() or settings.spotify_refresh_token
+    if not refresh_token:
+        raise Exception("No refresh token available. Please authenticate first.")
 
     try:
         response = await client.post(
             "https://accounts.spotify.com/api/token",
             auth=(settings.spotify_client_id, settings.spotify_client_secret),
-            data={"grant_type": "client_credentials"},
+            data={"grant_type": "refresh_token", "refresh_token": refresh_token},
             timeout=10.0,
         )
         response.raise_for_status()
         data = response.json()
+
         _access_token = data["access_token"]
+        _token_expires_at = time.time() + data.get("expires_in", 3600)
+
+        # If a new refresh token is provided, save it
+        if "refresh_token" in data:
+            _save_refresh_token(data["refresh_token"])
+
         return _access_token
     except httpx.HTTPError as e:
         raise Exception(f"Spotify auth error: {str(e)}") from e
@@ -69,7 +111,7 @@ async def get_current_track(client: httpx.AsyncClient) -> SpotifyStatus:
             timeout=10.0,
         )
         response.raise_for_status()
-        data = response.json() or {}
+        data = response.json() if response.status_code != 204 else {}
 
         is_playing = data.get("is_playing", False)
         item = data.get("item") or {}

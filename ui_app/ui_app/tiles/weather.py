@@ -19,7 +19,7 @@ def fetch_weather_data(api_base_url: str) -> WeatherResponse:
         Exception: If API call fails.
     """
     # Disable proxy for localhost connections to avoid corporate proxy redirects
-    with httpx.Client(timeout=5.0, proxies={}) as client:
+    with httpx.Client(timeout=5.0, trust_env=False) as client:
         response = client.get(f"{api_base_url}/api/weather/current")
         response.raise_for_status()
         data = response.json()
@@ -125,16 +125,15 @@ def render_tile(api_base_url: str):
             )
             st.markdown(f"Feels like {weather.feels_like:.1f}°C")
 
-            # Check if wind data is available (for backwards compatibility with cached data)
-            if hasattr(weather, "wind_deg") and hasattr(weather, "wind_speed"):
-                beaufort, description = get_beaufort_scale(weather.wind_speed)
-                direction = get_wind_direction_compass(weather.wind_deg)
-                st.markdown("**Wind**")
-                st.markdown(
-                    f"<h2 style='margin: 0; line-height: 1;'>{beaufort} <span style='font-size: 2.5rem;'>{direction}</span></h2>",
-                    unsafe_allow_html=True,
-                )
-                st.markdown(description)
+            # Wind information
+            beaufort, description = get_beaufort_scale(weather.wind_speed)
+            direction = get_wind_direction_compass(weather.wind_deg)
+            st.markdown("**Wind**")
+            st.markdown(
+                f"<h2 style='margin: 0; line-height: 1;'>{beaufort} <span style='font-size: 2.5rem;'>{direction}</span></h2>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(description)
 
         with col2:
             weather_emoji = get_weather_emoji(weather.condition)

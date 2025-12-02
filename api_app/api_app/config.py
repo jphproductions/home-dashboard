@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     spotify_client_id: str = ""
     spotify_client_secret: str = ""
-    spotify_redirect_uri: str = "http://localhost:8501/callback"
+    spotify_redirect_uri: str = "http://localhost:8000/api/spotify/auth/callback"
     spotify_refresh_token: str = ""
 
     ifttt_webhook_key: str = ""

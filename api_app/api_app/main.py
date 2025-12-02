@@ -2,8 +2,12 @@
 
 from contextlib import asynccontextmanager
 import httpx
+import warnings
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+
+# Suppress SSL warnings when using verify=False with corporate proxy
+warnings.filterwarnings("ignore", message="Unverified HTTPS request")
 
 from api_app import __version__
 from api_app.routers import weather, spotify, tv_tizen, phone_ifttt
@@ -21,16 +25,18 @@ async def lifespan(app: FastAPI):
 
     global http_client
 
-    # Check for proxy settings (support both standard and typo'd env vars)
-    proxy = os.getenv("HTTP_PROXY") or os.getenv("HTTP_PROXYz") or os.getenv("HTTPS_PROXY") or os.getenv("HTTPS_PROXYz")
+    # Use proxy for external APIs, but disable SSL verification to bypass corporate interception
+    # Check for proxy settings
+    proxy = os.getenv("HTTP_PROXY") or os.getenv("HTTPS_PROXY")
 
     if proxy:
-        print(f"HTTP client initialized with proxy: {proxy}")
+        print(f"HTTP client initialized with proxy: {proxy} (SSL verify disabled for corporate proxy)")
         http_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(10.0),
+            timeout=httpx.Timeout(30.0),  # Longer timeout for proxy
             limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
             follow_redirects=True,
             proxies=proxy,
+            verify=False,  # Disable SSL verification for corporate proxy
         )
     else:
         print("HTTP client initialized without proxy")

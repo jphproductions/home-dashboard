@@ -1,13 +1,27 @@
 """Spotify API routes."""
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+import secrets
+from urllib.parse import urlencode
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import RedirectResponse
 
 from api_app.dependencies import get_http_client
 from api_app.services import spotify_service
+from api_app.config import settings
 from shared.models.spotify import SpotifyStatus
 
 router = APIRouter()
+
+# Store state for OAuth flow (in production, use Redis or database)
+_oauth_states = {}
+
+# Spotify OAuth scopes needed for playback control
+SPOTIFY_SCOPES = [
+    "user-read-playback-state",
+    "user-modify-playback-state",
+    "user-read-currently-playing",
+]
 
 
 @router.get("/status", response_model=SpotifyStatus)
@@ -68,3 +82,86 @@ async def wake_tv_and_play(client: httpx.AsyncClient = Depends(get_http_client))
         return {"status": "transferring", "detail": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Wake/Play error: {str(e)}") from e
+
+
+@router.get("/auth/status")
+async def auth_status():
+    """Check if Spotify is authenticated."""
+    return {"authenticated": spotify_service.is_authenticated()}
+
+
+@router.get("/auth/login")
+async def auth_login():
+    """Initiate Spotify OAuth flow."""
+    # Generate random state for CSRF protection
+    state = secrets.token_urlsafe(32)
+    _oauth_states[state] = True
+
+    # Build Spotify authorization URL
+    params = {
+        "client_id": settings.spotify_client_id,
+        "response_type": "code",
+        "redirect_uri": settings.spotify_redirect_uri,
+        "state": state,
+        "scope": " ".join(SPOTIFY_SCOPES),
+        "show_dialog": "false",
+    }
+
+    auth_url = f"https://accounts.spotify.com/authorize?{urlencode(params)}"
+    return RedirectResponse(url=auth_url)
+
+
+@router.get("/auth/callback")
+async def auth_callback(
+    request: Request,
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+    client: httpx.AsyncClient = Depends(get_http_client),
+):
+    """Handle Spotify OAuth callback."""
+    # Check for errors
+    if error:
+        raise HTTPException(status_code=400, detail=f"Spotify auth failed: {error}")
+
+    # Verify state to prevent CSRF
+    if not state or state not in _oauth_states:
+        raise HTTPException(status_code=400, detail="Invalid state parameter")
+
+    # Clean up state
+    _oauth_states.pop(state, None)
+
+    # Verify we got an authorization code
+    if not code:
+        raise HTTPException(status_code=400, detail="No authorization code received")
+
+    try:
+        # Exchange code for tokens
+        response = await client.post(
+            "https://accounts.spotify.com/api/token",
+            auth=(settings.spotify_client_id, settings.spotify_client_secret),
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": settings.spotify_redirect_uri,
+            },
+            timeout=10.0,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        # Save refresh token
+        refresh_token = data.get("refresh_token")
+        if not refresh_token:
+            raise HTTPException(status_code=500, detail="No refresh token received")
+
+        spotify_service._save_refresh_token(refresh_token)
+
+        # Redirect back to Streamlit dashboard (assuming it's on port 8501)
+        streamlit_url = "http://127.0.0.1:8501"
+        return RedirectResponse(url=streamlit_url, status_code=303)
+
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=500, detail=f"Token exchange failed: {str(e)}") from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Authentication error: {str(e)}") from e
