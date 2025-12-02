@@ -2,8 +2,10 @@
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
+
+from api_app.dependencies import get_http_client
 from api_app.services import phone_ifttt_service
-from shared.models import PhoneRingRequest
+from shared.models.phone import PhoneRingRequest
 
 router = APIRouter()
 

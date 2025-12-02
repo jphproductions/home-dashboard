@@ -17,11 +17,28 @@ http_client: httpx.AsyncClient | None = None
 async def lifespan(app: FastAPI):
     """Manage application lifespan - startup and shutdown events."""
     # Startup: Create HTTP client with connection pooling
+    import os
+
     global http_client
-    http_client = httpx.AsyncClient(
-        timeout=httpx.Timeout(10.0), limits=httpx.Limits(max_keepalive_connections=5, max_connections=10)
-    )
-    print("HTTP client initialized with connection pooling")
+
+    # Check for proxy settings (support both standard and typo'd env vars)
+    proxy = os.getenv("HTTP_PROXY") or os.getenv("HTTP_PROXYz") or os.getenv("HTTPS_PROXY") or os.getenv("HTTPS_PROXYz")
+
+    if proxy:
+        print(f"HTTP client initialized with proxy: {proxy}")
+        http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(10.0),
+            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            follow_redirects=True,
+            proxies=proxy,
+        )
+    else:
+        print("HTTP client initialized without proxy")
+        http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(10.0),
+            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            follow_redirects=True,
+        )
     yield
     # Shutdown: Clean up resources
     if http_client:

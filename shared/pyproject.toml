@@ -3,10 +3,11 @@ name = "shared"
 version = "0.1.0"
 description = "Shared data models for home-dashboard"
 authors = ["Jelle Hilbrands, <jelle.hilbrands@outlook.com>"]
+include = ["shared/py.typed"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-pydantic = "^2.0"  # same version you use in api_app/ui_app
+pydantic = "^2.10"
 
 [[tool.poetry.packages]]
 include = "shared"

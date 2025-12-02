@@ -2,9 +2,10 @@
 
 import pytest
 import httpx
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
+
 from api_app.services import spotify_service
-from api_app.models import SpotifyStatus
+from shared.models.spotify import SpotifyStatus
 
 
 @pytest.fixture
