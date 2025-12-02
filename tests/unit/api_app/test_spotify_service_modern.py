@@ -8,6 +8,14 @@ from api_app.services import spotify_service
 from shared.models.spotify import SpotifyStatus
 
 
+@pytest.fixture(autouse=True)
+def reset_token_cache():
+    """Reset the global token cache before each test."""
+    spotify_service._access_token = None
+    yield
+    spotify_service._access_token = None
+
+
 @pytest.fixture
 def mock_http_client():
     """Create a mock HTTP client."""
@@ -42,13 +50,15 @@ async def test_get_current_track_success(
 ):
     """Test successful Spotify track fetch."""
     # Arrange
-    token_response = AsyncMock()
-    token_response.json.return_value = mock_spotify_token_response
-    token_response.raise_for_status = AsyncMock()
+    from unittest.mock import Mock
 
-    track_response = AsyncMock()
-    track_response.json.return_value = mock_spotify_playing_response
-    track_response.raise_for_status = AsyncMock()
+    token_response = Mock()
+    token_response.json = Mock(return_value=mock_spotify_token_response)
+    token_response.raise_for_status = Mock()
+
+    track_response = Mock()
+    track_response.json = Mock(return_value=mock_spotify_playing_response)
+    track_response.raise_for_status = Mock()
 
     # First call for token, second for track
     mock_http_client.post.return_value = token_response
@@ -73,13 +83,15 @@ async def test_get_current_track_nothing_playing(
 ):
     """Test Spotify status when nothing is playing."""
     # Arrange
-    token_response = AsyncMock()
-    token_response.json.return_value = mock_spotify_token_response
-    token_response.raise_for_status = AsyncMock()
+    from unittest.mock import Mock
 
-    track_response = AsyncMock()
-    track_response.json.return_value = {"is_playing": False}
-    track_response.raise_for_status = AsyncMock()
+    token_response = Mock()
+    token_response.json = Mock(return_value=mock_spotify_token_response)
+    token_response.raise_for_status = Mock()
+
+    track_response = Mock()
+    track_response.json = Mock(return_value={"is_playing": False})
+    track_response.raise_for_status = Mock()
 
     mock_http_client.post.return_value = token_response
     mock_http_client.get.return_value = track_response
@@ -97,12 +109,14 @@ async def test_get_current_track_nothing_playing(
 async def test_play_success(mock_http_client, mock_spotify_token_response):
     """Test successful play command."""
     # Arrange
-    token_response = AsyncMock()
-    token_response.json.return_value = mock_spotify_token_response
-    token_response.raise_for_status = AsyncMock()
+    from unittest.mock import Mock
 
-    play_response = AsyncMock()
-    play_response.raise_for_status = AsyncMock()
+    token_response = Mock()
+    token_response.json = Mock(return_value=mock_spotify_token_response)
+    token_response.raise_for_status = Mock()
+
+    play_response = Mock()
+    play_response.raise_for_status = Mock()
 
     mock_http_client.post.return_value = token_response
     mock_http_client.put.return_value = play_response
@@ -118,12 +132,14 @@ async def test_play_success(mock_http_client, mock_spotify_token_response):
 async def test_pause_success(mock_http_client, mock_spotify_token_response):
     """Test successful pause command."""
     # Arrange
-    token_response = AsyncMock()
-    token_response.json.return_value = mock_spotify_token_response
-    token_response.raise_for_status = AsyncMock()
+    from unittest.mock import Mock
 
-    pause_response = AsyncMock()
-    pause_response.raise_for_status = AsyncMock()
+    token_response = Mock()
+    token_response.json = Mock(return_value=mock_spotify_token_response)
+    token_response.raise_for_status = Mock()
+
+    pause_response = Mock()
+    pause_response.raise_for_status = Mock()
 
     mock_http_client.post.return_value = token_response
     mock_http_client.put.return_value = pause_response
@@ -139,12 +155,14 @@ async def test_pause_success(mock_http_client, mock_spotify_token_response):
 async def test_next_track_success(mock_http_client, mock_spotify_token_response):
     """Test successful next track command."""
     # Arrange
-    token_response = AsyncMock()
-    token_response.json.return_value = mock_spotify_token_response
-    token_response.raise_for_status = AsyncMock()
+    from unittest.mock import Mock
 
-    next_response = AsyncMock()
-    next_response.raise_for_status = AsyncMock()
+    token_response = Mock()
+    token_response.json = Mock(return_value=mock_spotify_token_response)
+    token_response.raise_for_status = Mock()
+
+    next_response = Mock()
+    next_response.raise_for_status = Mock()
 
     # Token call uses post, next also uses post
     mock_http_client.post.side_effect = [token_response, next_response]

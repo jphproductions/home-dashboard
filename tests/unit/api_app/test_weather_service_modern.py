@@ -54,9 +54,11 @@ def mock_weather_response():
 async def test_get_current_weather_success(mock_http_client, mock_weather_response):
     """Test successful weather fetch."""
     # Arrange
-    mock_response = AsyncMock()
-    mock_response.json.return_value = mock_weather_response
-    mock_response.raise_for_status = AsyncMock()
+    from unittest.mock import Mock
+
+    mock_response = Mock()
+    mock_response.json = Mock(return_value=mock_weather_response)
+    mock_response.raise_for_status = Mock()
     mock_http_client.get.return_value = mock_response
 
     # Act
@@ -69,6 +71,8 @@ async def test_get_current_weather_success(mock_http_client, mock_weather_respon
     assert result.condition == "Clouds"
     assert result.icon == "02d"
     assert result.location == "Den Bosch"
+    assert result.wind_speed == 3.5
+    assert result.wind_deg == 250
     assert result.recommendation  # Should have a recommendation
 
     # Verify HTTP client was called correctly
@@ -94,9 +98,13 @@ async def test_get_current_weather_http_error(mock_http_client):
 async def test_get_current_weather_malformed_response(mock_http_client):
     """Test weather fetch with malformed response."""
     # Arrange
-    mock_response = AsyncMock()
-    mock_response.json.return_value = {"invalid": "data"}  # Missing required fields
-    mock_response.raise_for_status = AsyncMock()
+    from unittest.mock import Mock
+
+    mock_response = Mock()
+    mock_response.json = Mock(
+        return_value={"invalid": "data"}
+    )  # Missing required fields
+    mock_response.raise_for_status = Mock()
     mock_http_client.get.return_value = mock_response
 
     # Act & Assert
