@@ -3,9 +3,9 @@
 import httpx
 import time
 from pathlib import Path
-from api_app.config import settings
-from api_app.models import SpotifyStatus
-from api_app.services import tv_tizen_service
+from home_dashboard.config import settings
+from home_dashboard.models import SpotifyStatus
+from home_dashboard.services import tv_tizen_service
 
 
 # Token cache with expiration tracking
@@ -120,9 +120,7 @@ async def get_current_track(client: httpx.AsyncClient) -> SpotifyStatus:
         return SpotifyStatus(
             is_playing=is_playing,
             track_name=item.get("name"),
-            artist_name=item.get("artists", [{}])[0].get("name")
-            if item.get("artists")
-            else None,
+            artist_name=item.get("artists", [{}])[0].get("name") if item.get("artists") else None,
             device_name=device.get("name"),
             progress_ms=data.get("progress_ms"),
             duration_ms=item.get("duration_ms") if item else None,

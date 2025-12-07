@@ -13,7 +13,7 @@ async def test_get_current_weather():
 
 def test_weather_recommendation_logic():
     """Test weather recommendation generation."""
-    from shared.models.weather import (
+    from home_dashboard.models.weather import (
         WeatherResponse,
         CurrentWeather,
         WeatherInfo,

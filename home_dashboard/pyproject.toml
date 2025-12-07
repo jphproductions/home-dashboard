@@ -1,10 +1,10 @@
 [tool.poetry]
-name = "api-app"
+name = "home-dashboard"
 version = "0.1.0"
-description = "FastAPI backend for home dashboard"
+description = "Home Dashboard - unified frontend and backend"
 authors = ["Jelle Hilbrands <jelle.hilbrands@outlook.com>"]
-packages = [{include = "api_app"}]
-include = ["api_app/py.typed"]
+packages = [{include = "home_dashboard"}]
+include = ["home_dashboard/py.typed"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -17,7 +17,6 @@ pydantic = "^2.10"
 pydantic-settings = "^2.7"
 jinja2 = "^3.1.0"
 python-multipart = "^0.0.9"
-shared = {path = "../shared", develop = true}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.0"
@@ -28,6 +27,10 @@ ruff = "^0.14.0"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["../tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 120

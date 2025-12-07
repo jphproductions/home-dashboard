@@ -1,8 +1,8 @@
 """Weather service for OpenWeatherMap API integration."""
 
 import httpx
-from api_app.config import settings
-from api_app.models.weather import CurrentWeather, WeatherResponse
+from home_dashboard.config import settings
+from home_dashboard.models.weather import CurrentWeather, WeatherResponse
 
 
 OPENWEATHER_URL = "https://api.openweathermap.org/data/2.5/weather"
@@ -30,9 +30,7 @@ async def get_current_weather(client: httpx.AsyncClient) -> WeatherResponse:
     }
 
     try:
-        response = await client.get(
-            OPENWEATHER_URL, params=params, timeout=10.0, follow_redirects=True
-        )
+        response = await client.get(OPENWEATHER_URL, params=params, timeout=10.0, follow_redirects=True)
         response.raise_for_status()
         data = response.json()
 
@@ -43,9 +41,7 @@ async def get_current_weather(client: httpx.AsyncClient) -> WeatherResponse:
         return WeatherResponse.from_openweather(current_weather)
 
     except httpx.HTTPStatusError as e:
-        raise Exception(
-            f"Weather API error (HTTP {e.response.status_code}): {e.response.text}"
-        ) from e
+        raise Exception(f"Weather API error (HTTP {e.response.status_code}): {e.response.text}") from e
     except httpx.HTTPError as e:
         raise Exception(f"Failed to fetch weather data: {str(e)}") from e
     except Exception as e:

@@ -1,0 +1,18 @@
+<div id="status-tile" class="status-area" style="padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; align-items: center;">
+        <div>
+            ⏰ Last updated: {{ last_updated }}
+        </div>
+        <div style="text-align: center;">
+            ✅ All systems operational
+        </div>
+        <div style="text-align: right;">
+            <button 
+                class="button button-secondary"
+                onclick="location.reload()"
+                style="font-size: 0.9rem; padding: 0.4rem 0.8rem;">
+                🔄 Refresh
+            </button>
+        </div>
+    </div>
+</div>

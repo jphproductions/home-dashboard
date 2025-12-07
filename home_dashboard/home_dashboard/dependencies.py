@@ -20,7 +20,7 @@ async def get_http_client(request: Request) -> httpx.AsyncClient:
     Raises:
         RuntimeError: If HTTP client is not initialized.
     """
-    from api_app.main import http_client
+    from home_dashboard.main import http_client
     
     if http_client is None:
         raise RuntimeError("HTTP client not initialized")

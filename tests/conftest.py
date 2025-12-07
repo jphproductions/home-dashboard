@@ -7,8 +7,9 @@ from unittest.mock import AsyncMock, patch
 
 # Import app
 import sys
-sys.path.insert(0, "api_app")
-from api_app.main import app as fastapi_app
+
+sys.path.insert(0, "home_dashboard")
+from home_dashboard.main import app as fastapi_app
 
 
 @pytest.fixture

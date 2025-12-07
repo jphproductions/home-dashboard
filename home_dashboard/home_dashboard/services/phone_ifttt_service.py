@@ -2,7 +2,7 @@
 
 import httpx
 from typing import Optional
-from api_app.config import settings
+from home_dashboard.config import settings
 
 
 async def ring_phone(client: httpx.AsyncClient, message: Optional[str] = None) -> str:

@@ -32,3 +32,6 @@ Thumbs.db
 
 # Poetry
 poetry.lock
+
+# Spotify
+playlists.json

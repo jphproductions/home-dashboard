@@ -2,7 +2,7 @@
 
 import streamlit as st
 import httpx
-from shared.models.weather import WeatherResponse
+from home_dashboard.models.weather import WeatherResponse
 
 
 @st.cache_data(ttl=600)  # Cache for 10 minutes

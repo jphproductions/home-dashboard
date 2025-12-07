@@ -3,7 +3,7 @@
 import pytest
 from httpx import AsyncClient, ASGITransport
 from unittest.mock import AsyncMock, patch
-from api_app.main import app
+from home_dashboard.main import app
 
 
 @pytest.fixture
@@ -68,7 +68,7 @@ async def test_weather_endpoint_with_mock_client(mock_http_client):
     mock_http_client.get.return_value = mock_response
 
     # Mock the dependency
-    with patch("api_app.main.http_client", mock_http_client):
+    with patch("home_dashboard.main.http_client", mock_http_client):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             response = await ac.get("/api/weather/current")
@@ -104,7 +104,7 @@ async def test_spotify_status_endpoint_with_mock(mock_http_client):
     mock_http_client.get.return_value = status_response
 
     # Mock the dependency
-    with patch("api_app.main.http_client", mock_http_client):
+    with patch("home_dashboard.main.http_client", mock_http_client):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             response = await ac.get("/api/spotify/status")
@@ -122,7 +122,7 @@ async def test_error_handling_propagation():
     mock_client = AsyncMock()
     mock_client.get.side_effect = Exception("Simulated error")
 
-    with patch("api_app.main.http_client", mock_client):
+    with patch("home_dashboard.main.http_client", mock_client):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             response = await ac.get("/api/weather/current")

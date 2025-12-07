@@ -1,11 +1,11 @@
 version: "3.8"
 
 services:
-  api:
+  dashboard:
     build:
       context: ..
       dockerfile: docker/Dockerfile.api
-    container_name: home-dashboard-api
+    container_name: home-dashboard
     ports:
       - "8000:8000"
     environment:
@@ -17,24 +17,12 @@ services:
       - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
       - SPOTIFY_REFRESH_TOKEN=${SPOTIFY_REFRESH_TOKEN}
       - IFTTT_WEBHOOK_KEY=${IFTTT_WEBHOOK_KEY}
+      - SPOTIFY_REDIRECT_URI=${SPOTIFY_REDIRECT_URI:-http://localhost:8000/api/spotify/auth/callback}
     restart: unless-stopped
     networks:
       - dashboard
-
-  ui:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.ui
-    container_name: home-dashboard-ui
-    ports:
-      - "8501:8501"
-    environment:
-      - API_BASE_URL=http://api:8000
-    depends_on:
-      - api
-    restart: unless-stopped
-    networks:
-      - dashboard
+    volumes:
+      - ~/.spotify_refresh_token:/root/.spotify_refresh_token
 
 networks:
   dashboard:

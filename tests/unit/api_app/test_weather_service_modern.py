@@ -4,8 +4,8 @@ import pytest
 import httpx
 from unittest.mock import AsyncMock
 
-from api_app.services import weather_service
-from shared.models.weather import WeatherResponse
+from home_dashboard.services import weather_service
+from home_dashboard.models.weather import WeatherResponse
 
 
 @pytest.fixture

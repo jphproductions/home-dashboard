@@ -4,8 +4,8 @@ import pytest
 import httpx
 from unittest.mock import AsyncMock
 
-from api_app.services import spotify_service
-from shared.models.spotify import SpotifyStatus
+from home_dashboard.services import spotify_service
+from home_dashboard.models.spotify import SpotifyStatus
 
 
 @pytest.fixture(autouse=True)

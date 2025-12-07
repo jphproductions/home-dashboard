@@ -5,18 +5,12 @@ from pathlib import Path
 import httpx
 import warnings
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from api_app import __version__
-from api_app.routers import (
-    phone_ifttt_router,
-    spotify_router,
-    tv_tizen_router,
-    weather_router,
-    pages,
-)
-from api_app.models import HealthResponse
+from home_dashboard import __version__
+from home_dashboard.routers import phone_ifttt_router, spotify, tv_tizen_router, weather_router, pages
+from home_dashboard.models import HealthResponse
 
 # Suppress SSL warnings when using verify=False with corporate proxy
 warnings.filterwarnings("ignore", message="Unverified HTTPS request")
@@ -38,9 +32,6 @@ async def lifespan(app: FastAPI):
     proxy = os.getenv("HTTP_PROXY") or os.getenv("HTTPS_PROXY")
 
     if proxy:
-        print(
-            f"HTTP client initialized with proxy: {proxy} (SSL verify disabled for corporate proxy)"
-        )
         http_client = httpx.AsyncClient(
             timeout=httpx.Timeout(30.0),  # Longer timeout for proxy
             limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
@@ -49,7 +40,6 @@ async def lifespan(app: FastAPI):
             verify=False,  # Disable SSL verification for corporate proxy
         )
     else:
-        print("HTTP client initialized without proxy")
         http_client = httpx.AsyncClient(
             timeout=httpx.Timeout(10.0),
             limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
@@ -76,7 +66,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 # Include routers
 app.include_router(pages.router, tags=["pages"])  # HTML pages (no prefix)
 app.include_router(weather_router.router, prefix="/api/weather", tags=["weather"])
-app.include_router(spotify_router.router, prefix="/api/spotify", tags=["spotify"])
+app.include_router(spotify.router, prefix="/api/spotify", tags=["spotify"])
 app.include_router(tv_tizen_router.router, prefix="/api/tv", tags=["tv"])
 app.include_router(phone_ifttt_router.router, prefix="/api/phone", tags=["phone"])
 
@@ -91,6 +81,12 @@ async def health_check():
 async def root():
     """Root endpoint."""
     return {"message": "Home Dashboard API", "docs": "/docs"}
+
+
+@app.get("/favicon.ico")
+async def favicon():
+    """Return empty favicon to prevent 404 errors."""
+    return Response(content=b"", media_type="image/x-icon")
 
 
 @app.exception_handler(Exception)

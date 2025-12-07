@@ -1,0 +1,131 @@
+<div id="spotify-tile" class="tile spotify-area">
+    <h2>🎵 Spotify</h2>
+    
+    {% if not authenticated %}
+    <!-- Authentication Required -->
+    <div class="message info">
+        <strong>Spotify Not Connected</strong><br>
+        Connect your Spotify account to control playback.
+    </div>
+    <a href="/api/spotify/auth/login" class="button button-primary">
+        🔗 Authenticate Spotify
+    </a>
+    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 1rem;">
+        You'll be redirected to Spotify, then automatically back to this dashboard.
+    </p>
+    
+    {% else %}
+    <!-- Current Track Info -->
+    {% if track_name %}
+    <div style="margin-bottom: 1.5rem;">
+        <strong>Now Playing:</strong><br>
+        🎵 {{ track_name }}<br>
+        {% if artist_name %}👤 {{ artist_name }}<br>{% endif %}
+        {% if device_name %}📱 {{ device_name }}{% endif %}
+    </div>
+    {% else %}
+    <div style="margin-bottom: 1.5rem; color: var(--text-secondary);">
+        Nothing currently playing
+    </div>
+    {% endif %}
+    
+    <!-- Playlist Selection -->
+    <div style="margin-bottom: 1.5rem;">
+        <strong>Select Playlist:</strong>
+        <div style="display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; margin-top: 0.5rem;">
+            <select id="playlist-select" name="playlist">
+                <option value="">Select...</option>
+                {% for playlist in playlists %}
+                <option value="{{ playlist.uri }}">{{ playlist.name }}</option>
+                {% endfor %}
+            </select>
+            <button 
+                class="button button-secondary"
+                hx-post="/api/spotify/play-playlist-from-form"
+                hx-include="#playlist-select"
+                hx-target="#spotify-tile"
+                hx-swap="outerHTML"
+                style="white-space: nowrap;">
+                ▶️ Play
+            </button>
+        </div>
+    </div>
+    
+    <!-- Playback Controls -->
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-bottom: 1.5rem;">
+        <button 
+            class="button button-secondary"
+            hx-post="/api/spotify/previous"
+            hx-target="#spotify-tile"
+            hx-swap="outerHTML">
+            ⏮️ Previous
+        </button>
+        
+        {% if is_playing %}
+        <button 
+            class="button button-secondary"
+            hx-post="/api/spotify/pause"
+            hx-target="#spotify-tile"
+            hx-swap="outerHTML">
+            ⏸️ Pause
+        </button>
+        {% else %}
+        <button 
+            class="button button-secondary"
+            hx-post="/api/spotify/play"
+            hx-target="#spotify-tile"
+            hx-swap="outerHTML">
+            ▶️ Play
+        </button>
+        {% endif %}
+        
+        <button 
+            class="button button-secondary"
+            hx-post="/api/spotify/next"
+            hx-target="#spotify-tile"
+            hx-swap="outerHTML">
+            ⏭️ Next
+        </button>
+        
+        <button 
+            class="button button-secondary"
+            disabled
+            title="Coming soon">
+            🔇 Mute
+        </button>
+    </div>
+    
+    <!-- Wake TV & Play -->
+    <button 
+        class="button button-primary"
+        hx-post="/api/spotify/wake-and-play"
+        hx-target="#spotify-tile"
+        hx-swap="outerHTML"
+        style="width: 100%;">
+        📺 Wake TV & Play
+    </button>
+    
+    {% endif %}
+</div>
+
+<script>
+    // Smart auto-refresh: reload tile when track is about to end or every 10s
+    {% if is_playing and progress_ms is not none and duration_ms is not none %}
+    (function() {
+        const timeRemainingMs = {{ duration_ms }} - {{ progress_ms }};
+        let refreshDelayMs;
+        
+        if (timeRemainingMs <= 10000) {
+            // Within final 10 seconds: refresh 1s after track ends
+            refreshDelayMs = timeRemainingMs + 1000;
+        } else {
+            // Check again in 10 seconds
+            refreshDelayMs = 10000;
+        }
+        
+        setTimeout(function() {
+            htmx.trigger('#spotify-tile', 'refresh');
+        }, refreshDelayMs);
+    })();
+    {% endif %}
+</script>

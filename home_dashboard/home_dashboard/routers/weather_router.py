@@ -3,9 +3,9 @@
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 
-from api_app.dependencies import get_http_client
-from api_app.services import weather_service
-from shared.models.weather import WeatherResponse
+from home_dashboard.dependencies import get_http_client
+from home_dashboard.services import weather_service
+from home_dashboard.models.weather import WeatherResponse
 
 router = APIRouter()
 

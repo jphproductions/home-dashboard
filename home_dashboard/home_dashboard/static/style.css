@@ -1,0 +1,233 @@
+/* Streamlit-inspired styling for home dashboard */
+
+:root {
+    --primary-color: #ff4b4b;
+    --background-color: #0e1117;
+    --secondary-bg: #262730;
+    --text-color: #fafafa;
+    --text-muted: #a3a8b4;
+    --border-color: #3d4148;
+    --success-color: #09ab3b;
+    --info-color: #0068c9;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Source Sans Pro", sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    padding: 2rem;
+    line-height: 1.6;
+}
+
+h1, h2, h3 {
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+h1 {
+    font-size: 2.5rem;
+    margin-bottom: 2rem;
+}
+
+h3 {
+    font-size: 1.25rem;
+}
+
+/* Dashboard Grid Layout */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+        "weather spotify"
+        "phone actions"
+        "status status";
+    gap: 1.5rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.weather-area { grid-area: weather; }
+.spotify-area { grid-area: spotify; }
+.phone-area { grid-area: phone; }
+.actions-area { grid-area: actions; }
+.status-area { grid-area: status; }
+
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "weather"
+            "spotify"
+            "phone"
+            "actions"
+            "status";
+    }
+}
+
+/* Tile Cards */
+.tile {
+    background-color: var(--secondary-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    transition: box-shadow 0.2s;
+}
+
+.tile:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.tile h3 {
+    margin-bottom: 1rem;
+    color: var(--primary-color);
+}
+
+/* Buttons */
+button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background-color 0.2s, opacity 0.2s;
+    font-weight: 500;
+}
+
+button:hover:not(:disabled) {
+    background-color: #ff6b6b;
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+button.secondary {
+    background-color: var(--secondary-bg);
+    border: 1px solid var(--border-color);
+}
+
+button.secondary:hover:not(:disabled) {
+    background-color: #3d4148;
+}
+
+/* Button Grid */
+.button-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+
+.button-grid button {
+    width: 100%;
+}
+
+/* Select Dropdown */
+select {
+    width: 100%;
+    padding: 0.5rem;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    font-size: 0.95rem;
+    cursor: pointer;
+}
+
+select:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+/* Playlist Selector */
+.playlist-selector {
+    display: grid;
+    grid-template-columns: 3fr 1fr;
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+
+/* Track Info */
+.track-info {
+    margin: 1rem 0;
+}
+
+.track-info p {
+    margin: 0.5rem 0;
+    color: var(--text-muted);
+}
+
+.track-info strong {
+    color: var(--text-color);
+}
+
+/* Caption/Muted Text */
+.caption {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+
+/* Loading Indicator */
+.htmx-indicator {
+    display: inline-block;
+    opacity: 0;
+    transition: opacity 200ms ease-in;
+}
+
+.htmx-request .htmx-indicator {
+    opacity: 1;
+}
+
+.htmx-request.htmx-indicator {
+    opacity: 1;
+}
+
+/* Success/Error Messages */
+.message {
+    padding: 0.75rem;
+    border-radius: 0.25rem;
+    margin: 0.5rem 0;
+}
+
+.message.success {
+    background-color: rgba(9, 171, 59, 0.2);
+    border: 1px solid var(--success-color);
+    color: var(--success-color);
+}
+
+.message.error {
+    background-color: rgba(255, 75, 75, 0.2);
+    border: 1px solid var(--primary-color);
+    color: var(--primary-color);
+}
+
+.message.info {
+    background-color: rgba(0, 104, 201, 0.2);
+    border: 1px solid var(--info-color);
+    color: var(--info-color);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    body {
+        padding: 1rem;
+    }
+    
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .button-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

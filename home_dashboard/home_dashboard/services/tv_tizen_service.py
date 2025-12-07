@@ -2,7 +2,7 @@
 
 import json
 import websockets
-from api_app.config import settings
+from home_dashboard.config import settings
 
 
 # Simple in-memory state tracker

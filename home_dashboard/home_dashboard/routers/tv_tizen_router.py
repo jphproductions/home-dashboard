@@ -1,7 +1,7 @@
 """TV Tizen API routes."""
 
 from fastapi import APIRouter, HTTPException
-from api_app.services import tv_tizen_service
+from home_dashboard.services import tv_tizen_service
 
 router = APIRouter()
 
