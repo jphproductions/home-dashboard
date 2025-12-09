@@ -29,9 +29,3 @@ Thumbs.db
 
 # Docker
 .dockerignore
-
-# Poetry
-poetry.lock
-
-# Spotify
-playlists.json

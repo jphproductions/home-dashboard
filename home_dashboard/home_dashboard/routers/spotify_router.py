@@ -1,15 +1,17 @@
-"""Spotify API routes."""
+"""Spotify API routes with support for JSON and HTML responses."""
 
+import asyncio
 import httpx
 import secrets
+from typing import Literal
 from urllib.parse import urlencode
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from fastapi.responses import RedirectResponse, HTMLResponse
 
 from home_dashboard.dependencies import get_http_client
 from home_dashboard.services import spotify_service
 from home_dashboard.config import settings
-from home_dashboard.models.spotify import SpotifyStatus
+from home_dashboard.views.template_renderer import TemplateRenderer
 
 router = APIRouter()
 
@@ -26,10 +28,27 @@ SPOTIFY_SCOPES = [
 ]
 
 
-@router.get("/status", response_model=SpotifyStatus)
-async def get_spotify_status(client: httpx.AsyncClient = Depends(get_http_client)):
-    """Get current Spotify playback status."""
+@router.get("/status")
+async def get_spotify_status(
+    request: Request,
+    client: httpx.AsyncClient = Depends(get_http_client),
+    format: Literal["json", "html"] = Query(default="json", description="Response format"),
+):
+    """Get current Spotify playback status.
+
+    Args:
+        request: FastAPI request object
+        client: HTTP client from dependency injection
+        format: Response format - 'json' for API, 'html' for HTMX
+
+    Returns:
+        JSON with SpotifyStatus model or HTML tile fragment
+    """
     try:
+        if format == "html":
+            return await TemplateRenderer.render_spotify_tile(request, client)
+
+        # JSON response
         status = await spotify_service.get_current_track(client)
         return status
     except Exception as e:
@@ -37,75 +56,216 @@ async def get_spotify_status(client: httpx.AsyncClient = Depends(get_http_client
 
 
 @router.post("/play")
-async def play(client: httpx.AsyncClient = Depends(get_http_client)):
-    """Resume playback."""
+async def play(
+    request: Request,
+    client: httpx.AsyncClient = Depends(get_http_client),
+    format: Literal["json", "html"] = Query(default="html", description="Response format"),
+):
+    """Resume playback.
+
+    Args:
+        request: FastAPI request object
+        client: HTTP client from dependency injection
+        format: Response format - 'json' for API, 'html' for HTMX
+
+    Returns:
+        JSON with status or HTML tile fragment
+    """
     try:
         await spotify_service.play(client)
+        await asyncio.sleep(0.5)  # Wait for Spotify API to update state
+
+        if format == "html":
+            return await TemplateRenderer.render_spotify_tile(request, client)
+
         return {"status": "playing"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Spotify error: {str(e)}") from e
 
 
 @router.post("/pause")
-async def pause(client: httpx.AsyncClient = Depends(get_http_client)):
-    """Pause playback."""
+async def pause(
+    request: Request,
+    client: httpx.AsyncClient = Depends(get_http_client),
+    format: Literal["json", "html"] = Query(default="html", description="Response format"),
+):
+    """Pause playback.
+
+    Args:
+        request: FastAPI request object
+        client: HTTP client from dependency injection
+        format: Response format - 'json' for API, 'html' for HTMX
+
+    Returns:
+        JSON with status or HTML tile fragment
+    """
     try:
         await spotify_service.pause(client)
+        await asyncio.sleep(0.5)  # Wait for Spotify API to update state
+
+        if format == "html":
+            return await TemplateRenderer.render_spotify_tile(request, client)
+
         return {"status": "paused"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Spotify error: {str(e)}") from e
 
 
 @router.post("/next")
-async def next_track(client: httpx.AsyncClient = Depends(get_http_client)):
-    """Skip to next track."""
+async def next_track(
+    request: Request,
+    client: httpx.AsyncClient = Depends(get_http_client),
+    format: Literal["json", "html"] = Query(default="html", description="Response format"),
+):
+    """Skip to next track.
+
+    Args:
+        request: FastAPI request object
+        client: HTTP client from dependency injection
+        format: Response format - 'json' for API, 'html' for HTMX
+
+    Returns:
+        JSON with status or HTML tile fragment
+    """
     try:
         await spotify_service.next_track(client)
-        return {"status": "skipped"}
+        await asyncio.sleep(0.5)  # Wait for Spotify API to update state
+
+        if format == "html":
+            return await TemplateRenderer.render_spotify_tile(request, client)
+
+        return {"status": "next_track"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Spotify error: {str(e)}") from e
 
 
 @router.post("/previous")
-async def previous_track(client: httpx.AsyncClient = Depends(get_http_client)):
-    """Go to previous track."""
+async def previous_track(
+    request: Request,
+    client: httpx.AsyncClient = Depends(get_http_client),
+    format: Literal["json", "html"] = Query(default="html", description="Response format"),
+):
+    """Go to previous track.
+
+    Args:
+        request: FastAPI request object
+        client: HTTP client from dependency injection
+        format: Response format - 'json' for API, 'html' for HTMX
+
+    Returns:
+        JSON with status or HTML tile fragment
+    """
     try:
         await spotify_service.previous_track(client)
-        return {"status": "previous"}
+        await asyncio.sleep(0.5)  # Wait for Spotify API to update state
+
+        if format == "html":
+            return await TemplateRenderer.render_spotify_tile(request, client)
+
+        return {"status": "previous_track"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Spotify error: {str(e)}") from e
 
 
 @router.post("/wake-and-play")
-async def wake_tv_and_play(client: httpx.AsyncClient = Depends(get_http_client)):
-    """Wake TV and transfer current playback."""
+async def wake_tv_and_play(
+    request: Request,
+    client: httpx.AsyncClient = Depends(get_http_client),
+    format: Literal["json", "html"] = Query(default="html", description="Response format"),
+):
+    """Wake TV and transfer current playback.
+
+    Args:
+        request: FastAPI request object
+        client: HTTP client from dependency injection
+        format: Response format - 'json' for API, 'html' for HTMX
+
+    Returns:
+        JSON with status or HTML tile fragment
+    """
     try:
-        result = await spotify_service.wake_tv_and_play(client)
-        return {"status": "transferring", "detail": result}
+        await spotify_service.wake_tv_and_play(client)
+
+        if format == "html":
+            return await TemplateRenderer.render_spotify_tile(request, client)
+
+        return {"status": "wake_and_play"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Wake/Play error: {str(e)}") from e
 
 
-@router.get("/playlists")
-async def get_playlists():
-    """Get hardcoded favorite playlists from config."""
-    return {"playlists": settings.spotify_favorite_playlists}
-
-
 @router.post("/play-playlist/{playlist_uri}")
-async def play_playlist(playlist_uri: str, client: httpx.AsyncClient = Depends(get_http_client)):
-    """Start playing a playlist."""
+async def play_playlist(
+    playlist_uri: str,
+    client: httpx.AsyncClient = Depends(get_http_client),
+):
+    """Start playing a playlist (from URL path).
+
+    Args:
+        playlist_uri: Spotify playlist URI
+        client: HTTP client from dependency injection
+
+    Returns:
+        JSON with status
+    """
     try:
         await spotify_service.play_playlist(client, playlist_uri)
-        return {"status": "playing_playlist"}
+        return {"status": "playing_playlist", "playlist_uri": playlist_uri}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Play playlist error: {str(e)}") from e
+
+
+@router.post("/play-playlist-from-form")
+async def play_playlist_from_form(
+    request: Request,
+    client: httpx.AsyncClient = Depends(get_http_client),
+):
+    """Start playing a playlist (from form data) and return updated tile HTML.
+
+    Args:
+        request: FastAPI request object with form data
+        client: HTTP client from dependency injection
+
+    Returns:
+        HTML tile fragment (always HTML for form submissions)
+    """
+    try:
+        # Get form data
+        form = await request.form()
+        playlist_uri_value = form.get("playlist")
+
+        # Ensure it's a string
+        if not playlist_uri_value or not isinstance(playlist_uri_value, str):
+            raise HTTPException(status_code=400, detail="No playlist selected")
+
+        # Start playing playlist
+        await spotify_service.play_playlist(client, playlist_uri_value)
+
+        # Return updated tile
+        return await TemplateRenderer.render_spotify_tile(request, client)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Play playlist error: {str(e)}") from e
 
 
 @router.get("/auth/status")
-async def auth_status():
-    """Check if Spotify is authenticated."""
-    return {"authenticated": spotify_service.is_authenticated()}
+async def auth_status(
+    format: Literal["json", "html"] = Query(default="json", description="Response format"),
+):
+    """Check if Spotify is authenticated.
+
+    Args:
+        format: Response format - 'json' for API, 'html' for status message
+
+    Returns:
+        JSON with authentication status or HTML message
+    """
+    authenticated = spotify_service.is_authenticated()
+
+    if format == "html":
+        status_text = "✅ Authenticated" if authenticated else "❌ Not authenticated"
+        return HTMLResponse(content=f"<div>{status_text}</div>")
+
+    return {"authenticated": authenticated}
 
 
 @router.get("/auth/login")
@@ -175,9 +335,8 @@ async def auth_callback(
 
         spotify_service._save_refresh_token(refresh_token)
 
-        # Redirect back to Streamlit dashboard (assuming it's on port 8501)
-        streamlit_url = "http://127.0.0.1:8501"
-        return RedirectResponse(url=streamlit_url, status_code=303)
+        # Redirect back to dashboard homepage
+        return RedirectResponse(url="/", status_code=303)
 
     except httpx.HTTPError as e:
         raise HTTPException(status_code=500, detail=f"Token exchange failed: {str(e)}") from e

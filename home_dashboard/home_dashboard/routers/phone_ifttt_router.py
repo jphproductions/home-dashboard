@@ -1,22 +1,38 @@
-"""Phone IFTTT API routes."""
+"""Phone/IFTTT API routes with support for JSON and HTML responses."""
 
+from typing import Literal
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
 
 from home_dashboard.dependencies import get_http_client
 from home_dashboard.services import phone_ifttt_service
-from home_dashboard.models.phone import PhoneRingRequest
+from home_dashboard.views.template_renderer import TemplateRenderer
 
 router = APIRouter()
 
 
 @router.post("/ring")
 async def ring_phone(
-    request: PhoneRingRequest = PhoneRingRequest(), client: httpx.AsyncClient = Depends(get_http_client)
+    request: Request,
+    client: httpx.AsyncClient = Depends(get_http_client),
+    format: Literal["json", "html"] = Query(default="html", description="Response format"),
 ):
-    """Ring Jamie's phone via IFTTT webhook."""
+    """Trigger IFTTT webhook to ring phone.
+
+    Args:
+        request: FastAPI request object
+        client: HTTP client from dependency injection
+        format: Response format - 'json' for API, 'html' for HTMX
+
+    Returns:
+        JSON with status or HTML tile fragment
+    """
     try:
-        result = await phone_ifttt_service.ring_phone(client, request.message)
-        return {"status": "ring_sent", "detail": result}
+        await phone_ifttt_service.ring_phone(client)
+
+        if format == "html":
+            return TemplateRenderer.render_phone_tile(request)
+
+        return {"status": "webhook_triggered", "action": "ring_phone"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Phone ring error: {str(e)}") from e
+        raise HTTPException(status_code=500, detail=f"IFTTT error: {str(e)}") from e

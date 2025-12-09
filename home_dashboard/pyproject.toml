@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "home-dashboard"
-version = "0.1.0"
+version = "0.2.0"
 description = "Home Dashboard - unified frontend and backend"
 authors = ["Jelle Hilbrands <jelle.hilbrands@outlook.com>"]
 packages = [{include = "home_dashboard"}]
