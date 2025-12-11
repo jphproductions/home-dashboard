@@ -1,22 +1,63 @@
-FROM python:3.11-slim
+# Multi-stage Dockerfile for Home Dashboard API
+# Stage 1: Builder - Install dependencies and build application
+FROM python:3.11-slim AS builder
 
 WORKDIR /code
 
 # Install Poetry
-RUN pip install --no-cache-dir poetry
+RUN pip install --no-cache-dir poetry==1.7.1
 
-# Copy pyproject.toml and poetry.lock for dependency installation
+# Copy dependency files
 COPY pyproject.toml poetry.lock ./
 
-# Install dependencies
-RUN poetry install --no-dev
+# Configure poetry to not create virtual env (we're already in a container)
+RUN poetry config virtualenvs.create false
 
-# Copy home dashboard app
+# Install dependencies (including dev dependencies for building)
+RUN poetry install --no-interaction --no-ansi
+
+# Copy application code
 COPY home_dashboard /code/home_dashboard
 COPY playlists.json /code/playlists.json
 
-# Expose port
+
+# Stage 2: Runtime - Minimal production image
+FROM python:3.11-slim AS runtime
+
+# Create non-root user for security
+RUN groupadd -r dashboard && useradd -r -g dashboard dashboard
+
+WORKDIR /code
+
+# Install Poetry (needed for runtime)
+RUN pip install --no-cache-dir poetry==1.7.1
+
+# Copy dependency files
+COPY pyproject.toml poetry.lock ./
+
+# Configure poetry to not create virtual env
+RUN poetry config virtualenvs.create false
+
+# Install production dependencies only
+RUN poetry install --no-interaction --no-ansi --only main
+
+# Copy application code from builder
+COPY --from=builder /code/home_dashboard /code/home_dashboard
+COPY --from=builder /code/playlists.json /code/playlists.json
+
+# Change ownership to non-root user
+RUN chown -R dashboard:dashboard /code
+
+# Switch to non-root user
+USER dashboard
+
+# Expose port 8000
 EXPOSE 8000
 
-# Run FastAPI
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import httpx; httpx.get('http://localhost:8000/health', timeout=5).raise_for_status()" || exit 1
+
+# Run FastAPI with uvicorn
 CMD ["poetry", "run", "uvicorn", "home_dashboard.main:app", "--host", "0.0.0.0", "--port", "8000"]
+

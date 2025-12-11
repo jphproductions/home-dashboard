@@ -1,15 +1,18 @@
 [Unit]
 Description=Chromium Kiosk Mode for Home Dashboard
-After=network.target
+After=network-online.target docker-dashboard.service
+Wants=network-online.target
 
 [Service]
 Type=simple
 User=pi
 Environment="DISPLAY=:0"
 Environment="XAUTHORITY=/home/pi/.Xauthority"
-ExecStart=/usr/bin/chromium-browser --kiosk --noerrdialogs --disable-translate --no-first-run --fast --fast-start --disable-popup-blocking --disable-prompt-on-repost --disable-session-crashed-bubble --disable-infobars http://localhost:8501
+# Updated to use FastAPI port 8000 (was 8501 for Streamlit)
+ExecStart=/usr/bin/chromium-browser --kiosk --noerrdialogs --disable-translate --no-first-run --fast --fast-start --disable-popup-blocking --disable-prompt-on-repost --disable-session-crashed-bubble --disable-infobars http://localhost:8000
 Restart=on-failure
 RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
+

@@ -1,16 +1,21 @@
 [Unit]
 Description=Home Dashboard Docker Container
-After=docker.service
+After=docker.service network-online.target
 Requires=docker.service
+Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/pi/home-dashboard
-ExecStart=/usr/bin/docker-compose up
-ExecStop=/usr/bin/docker-compose down
+WorkingDirectory=/home/pi/home-dashboard/docker
+# Use docker compose (modern syntax) with absolute path to compose file
+ExecStart=/usr/bin/docker compose -f /home/pi/home-dashboard/docker/docker-compose.yml up
+ExecStop=/usr/bin/docker compose -f /home/pi/home-dashboard/docker/docker-compose.yml down
 Restart=on-failure
 RestartSec=10
 User=pi
+# Load environment variables from .env file
+EnvironmentFile=-/home/pi/home-dashboard/.env
 
 [Install]
 WantedBy=multi-user.target
+
