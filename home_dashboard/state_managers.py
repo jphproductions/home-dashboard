@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 
 class StateManager(ABC):
     """Base class for all state managers.
-    
+
     State managers provide thread-safe access to mutable application state.
     All subclasses must implement lifecycle methods.
     """
@@ -28,7 +28,7 @@ class StateManager(ABC):
 
 class SpotifyAuthManager(StateManager):
     """Manages Spotify authentication tokens with caching and auto-refresh.
-    
+
     Provides thread-safe access to Spotify access tokens with automatic
     expiration tracking and refresh when needed.
     """
@@ -53,32 +53,34 @@ class SpotifyAuthManager(StateManager):
 
     async def get_token(self) -> str | None:
         """Get the current access token if available and not expired.
-        
+
         Returns:
             Access token string or None if expired/not set
         """
         async with self._lock:
             import time
+
             if self._access_token and self._token_expires_at > time.time():
                 return self._access_token
             return None
 
     async def set_token(self, token: str, expires_in: int) -> None:
         """Set a new access token with expiration.
-        
+
         Args:
             token: The access token string
             expires_in: Expiration time in seconds
         """
         async with self._lock:
             import time
+
             self._access_token = token
             self._token_expires_at = time.time() + expires_in
 
 
 class TVStateManager(StateManager):
     """Manages TV state including wake failure tracking.
-    
+
     Provides thread-safe tracking of TV wake failures for monitoring
     and debugging purposes.
     """
@@ -101,7 +103,7 @@ class TVStateManager(StateManager):
 
     async def get_wake_failure_count(self) -> int:
         """Get the current wake failure count.
-        
+
         Returns:
             Number of wake failures
         """
@@ -110,7 +112,7 @@ class TVStateManager(StateManager):
 
     async def increment_wake_failure(self) -> int:
         """Increment wake failure count.
-        
+
         Returns:
             Updated failure count
         """

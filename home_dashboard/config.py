@@ -17,7 +17,7 @@ class Settings(BaseSettings):
 
     Critical fields are required and will raise validation errors if missing.
     All secrets must be provided via environment variables or .env file.
-    
+
     Uses Pydantic v2 API:
     - model_config with SettingsConfigDict
     - @field_validator decorator
@@ -59,30 +59,30 @@ class Settings(BaseSettings):
     @cached_property
     def spotify_favorite_playlists(self) -> list[dict]:
         """Load and validate playlists from JSON file.
-        
+
         Uses @cached_property so file is read only once per Settings instance.
         Validates that the file exists and contains valid JSON array.
-        
+
         Returns:
             List of playlist dictionaries
-            
+
         Raises:
             ValueError: If file is missing or invalid JSON
         """
         file_path = BASE_DIR / "playlists.json"
-        
+
         if not file_path.exists():
             logger.warning(f"playlists.json not found at {file_path}, returning empty list")
             return []
-        
+
         try:
             content = file_path.read_text(encoding="utf-8")
             data = json.loads(content)
-            
+
             # Validate it's a list (per task requirements: just check valid JSON)
             if not isinstance(data, list):
                 raise ValueError("playlists.json must contain a JSON array")
-                
+
             return data
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON in playlists.json: {e}")
@@ -96,7 +96,7 @@ class Settings(BaseSettings):
         if not v:
             raise ValueError("api_host cannot be empty")
         return v
-    
+
     @field_validator("tv_ip", mode="after")
     @classmethod
     def validate_tv_ip(cls, v: str) -> str:
@@ -123,11 +123,11 @@ class Settings(BaseSettings):
         """Ensure redirect URI is valid and uses correct port."""
         if not v.startswith(("http://", "https://")):
             raise ValueError("spotify_redirect_uri must be a valid http:// or https:// URL")
-        
+
         # Warn if using wrong port (8501 is old Streamlit port)
         if ":8501" in v:
             logger.warning("spotify_redirect_uri uses port 8501 (Streamlit). Should be 8000 for FastAPI.")
-            
+
         return v
 
 
@@ -137,14 +137,14 @@ _settings_instance: Settings | None = None
 
 def get_settings() -> Settings:
     """Get singleton Settings instance for dependency injection.
-    
+
     This function creates a singleton to avoid re-reading .env file
     on every request. Use this with FastAPI's Depends() for
     dependency injection.
-    
+
     Returns:
         Cached Settings instance
-        
+
     Example:
         @app.get("/")
         async def route(settings: Settings = Depends(get_settings)):

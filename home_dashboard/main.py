@@ -63,7 +63,7 @@ async def log_response(response: httpx.Response) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Manage application lifespan - startup and shutdown events.
-    
+
     Per FastAPI 0.122.0+ breaking changes: Exceptions after yield MUST be
     re-raised to prevent memory leaks and ensure proper cleanup.
     """
@@ -85,10 +85,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.warning(f"Using proxy: {proxy} (SSL verification disabled for corporate proxy)")
         client = httpx.AsyncClient(
             timeout=httpx.Timeout(
-                connect=5.0,   # Connection establishment timeout
-                read=30.0,     # Longer read timeout for proxy
-                write=5.0,     # Write operation timeout
-                pool=5.0,      # Pool checkout timeout
+                connect=5.0,  # Connection establishment timeout
+                read=30.0,  # Longer read timeout for proxy
+                write=5.0,  # Write operation timeout
+                pool=5.0,  # Pool checkout timeout
             ),
             limits=httpx.Limits(
                 max_keepalive_connections=5,
@@ -104,10 +104,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info("Creating HTTP client with SSL verification enabled")
         client = httpx.AsyncClient(
             timeout=httpx.Timeout(
-                connect=5.0,   # Connection establishment timeout
-                read=10.0,     # Read response timeout
-                write=5.0,     # Write operation timeout
-                pool=5.0,      # Pool checkout timeout
+                connect=5.0,  # Connection establishment timeout
+                read=10.0,  # Read response timeout
+                write=5.0,  # Write operation timeout
+                pool=5.0,  # Pool checkout timeout
             ),
             limits=httpx.Limits(
                 max_keepalive_connections=5,
@@ -139,12 +139,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     finally:
         # Cleanup always runs, even if exception was raised
         logger.info("Shutting down Home Dashboard application")
-        
+
         # Cleanup state managers
         await app.state.spotify_auth_manager.cleanup()
         await app.state.tv_state_manager.cleanup()
         logger.info("State managers cleaned up")
-        
+
         await client.aclose()
         logger.info("HTTP client closed")
 
@@ -192,7 +192,7 @@ async def favicon():
 @app.exception_handler(DashboardException)
 async def dashboard_exception_handler(request, exc: DashboardException):
     """Handle custom dashboard exceptions with proper HTTP status codes.
-    
+
     Returns structured JSON error responses with status code, error code,
     message, and optional details for client-side error handling.
     """
@@ -205,7 +205,7 @@ async def dashboard_exception_handler(request, exc: DashboardException):
         "code": exc.code.value,
         "message": exc.message,
     }
-    
+
     # Include details only if present (avoid empty objects)
     if exc.details:
         error_content["details"] = exc.details

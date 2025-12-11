@@ -31,7 +31,7 @@ class TemplateRenderer:
     async def render_spotify_tile(
         request: Request,
         client: httpx.AsyncClient,
-        auth_manager: 'SpotifyAuthManager',
+        auth_manager: "SpotifyAuthManager",
         settings: Settings | None = None,
     ) -> HTMLResponse:
         """Render Spotify tile fragment.
@@ -47,7 +47,7 @@ class TemplateRenderer:
         """
         if settings is None:
             settings = get_settings()
-        
+
         # Check authentication
         authenticated = spotify_service.is_authenticated(settings)
 

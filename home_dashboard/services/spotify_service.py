@@ -50,7 +50,7 @@ def _save_refresh_token(refresh_token: str) -> None:
 
 def is_authenticated(settings: Settings | None = None) -> bool:
     """Check if we have a refresh token available.
-    
+
     Args:
         settings: Settings instance (defaults to singleton)
     """
@@ -60,9 +60,7 @@ def is_authenticated(settings: Settings | None = None) -> bool:
 
 
 async def _get_access_token(
-    client: httpx.AsyncClient, 
-    auth_manager: SpotifyAuthManager,
-    settings: Settings | None = None
+    client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, settings: Settings | None = None
 ) -> str:
     """
     Get Spotify access token using refresh token flow.
@@ -82,7 +80,7 @@ async def _get_access_token(
     """
     if settings is None:
         settings = get_settings()
-    
+
     # Check if we have a valid cached token
     cached_token = await auth_manager.get_token()
     if cached_token:
@@ -108,7 +106,7 @@ async def _get_access_token(
 
         access_token = data["access_token"]
         expires_in = data.get("expires_in", 3600)
-        
+
         # Store in manager
         await auth_manager.set_token(access_token, expires_in)
 
@@ -129,7 +127,9 @@ async def _get_access_token(
         ) from e
 
 
-async def get_current_track(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, settings: Settings | None = None) -> SpotifyStatus:
+async def get_current_track(
+    client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, settings: Settings | None = None
+) -> SpotifyStatus:
     """
     Get current playback state on Spotify.
 
@@ -146,7 +146,7 @@ async def get_current_track(client: httpx.AsyncClient, auth_manager: SpotifyAuth
     """
     if settings is None:
         settings = get_settings()
-    
+
     try:
         token = await _get_access_token(client, auth_manager, settings)
         response = await client.get(
@@ -188,7 +188,7 @@ async def play(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, sett
     """
     if settings is None:
         settings = get_settings()
-    
+
     try:
         token = await _get_access_token(client, auth_manager, settings)
         response = await client.put(
@@ -216,7 +216,7 @@ async def pause(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, set
     """
     if settings is None:
         settings = get_settings()
-    
+
     try:
         token = await _get_access_token(client, auth_manager, settings)
         response = await client.put(
@@ -234,7 +234,9 @@ async def pause(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, set
         ) from e
 
 
-async def next_track(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, settings: Settings | None = None) -> None:
+async def next_track(
+    client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, settings: Settings | None = None
+) -> None:
     """Skip to next track.
 
     Args:
@@ -244,7 +246,7 @@ async def next_track(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager
     """
     if settings is None:
         settings = get_settings()
-    
+
     try:
         token = await _get_access_token(client, auth_manager, settings)
         response = await client.post(
@@ -262,7 +264,9 @@ async def next_track(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager
         ) from e
 
 
-async def previous_track(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, settings: Settings | None = None) -> None:
+async def previous_track(
+    client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, settings: Settings | None = None
+) -> None:
     """Go to previous track.
 
     Args:
@@ -272,7 +276,7 @@ async def previous_track(client: httpx.AsyncClient, auth_manager: SpotifyAuthMan
     """
     if settings is None:
         settings = get_settings()
-    
+
     try:
         token = await _get_access_token(client, auth_manager, settings)
         response = await client.post(
@@ -290,7 +294,12 @@ async def previous_track(client: httpx.AsyncClient, auth_manager: SpotifyAuthMan
         ) from e
 
 
-async def wake_tv_and_play(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, tv_manager: 'TVStateManager', settings: Settings | None = None) -> str:
+async def wake_tv_and_play(
+    client: httpx.AsyncClient,
+    auth_manager: SpotifyAuthManager,
+    tv_manager: "TVStateManager",
+    settings: Settings | None = None,
+) -> str:
     """
     Wake TV and transfer current playback to TV device.
 
@@ -312,7 +321,7 @@ async def wake_tv_and_play(client: httpx.AsyncClient, auth_manager: SpotifyAuthM
     """
     if settings is None:
         settings = get_settings()
-    
+
     try:
         # Wake TV first
         await tv_tizen_service.wake(settings, tv_manager)
@@ -335,7 +344,9 @@ async def wake_tv_and_play(client: httpx.AsyncClient, auth_manager: SpotifyAuthM
         ) from e
 
 
-async def play_playlist(client: httpx.AsyncClient, playlist_uri: str, auth_manager: SpotifyAuthManager, settings: Settings | None = None) -> None:
+async def play_playlist(
+    client: httpx.AsyncClient, playlist_uri: str, auth_manager: SpotifyAuthManager, settings: Settings | None = None
+) -> None:
     """
     Start playing a playlist.
 
@@ -350,7 +361,7 @@ async def play_playlist(client: httpx.AsyncClient, playlist_uri: str, auth_manag
     """
     if settings is None:
         settings = get_settings()
-    
+
     try:
         token = await _get_access_token(client, auth_manager, settings)
         response = await client.put(

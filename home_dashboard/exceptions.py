@@ -6,33 +6,33 @@ from typing import Any
 
 class ErrorCode(str, Enum):
     """Error codes for structured error responses."""
-    
+
     # Generic errors
     DASHBOARD_ERROR = "DASHBOARD_ERROR"
     INTERNAL_ERROR = "INTERNAL_ERROR"
     VALIDATION_ERROR = "VALIDATION_ERROR"
-    
+
     # Spotify errors
     SPOTIFY_ERROR = "SPOTIFY_ERROR"
     SPOTIFY_AUTH_ERROR = "SPOTIFY_AUTH_ERROR"
     SPOTIFY_NOT_AUTHENTICATED = "SPOTIFY_NOT_AUTHENTICATED"
     SPOTIFY_API_ERROR = "SPOTIFY_API_ERROR"
     SPOTIFY_RATE_LIMIT = "SPOTIFY_RATE_LIMIT"
-    
+
     # TV errors
     TV_ERROR = "TV_ERROR"
     TV_CONNECTION_ERROR = "TV_CONNECTION_ERROR"
     TV_TIMEOUT = "TV_TIMEOUT"
-    
+
     # Weather errors
     WEATHER_ERROR = "WEATHER_ERROR"
     WEATHER_API_ERROR = "WEATHER_API_ERROR"
     WEATHER_INVALID_LOCATION = "WEATHER_INVALID_LOCATION"
-    
+
     # Phone/IFTTT errors
     PHONE_ERROR = "PHONE_ERROR"
     IFTTT_ERROR = "IFTTT_ERROR"
-    
+
     # Configuration errors
     CONFIG_ERROR = "CONFIG_ERROR"
     CONFIG_MISSING = "CONFIG_MISSING"
@@ -41,7 +41,7 @@ class ErrorCode(str, Enum):
 
 class DashboardException(Exception):
     """Base exception for dashboard errors with HTTP status code support.
-    
+
     All custom exceptions should inherit from this class to ensure
     consistent error handling across the application.
     """
@@ -54,7 +54,7 @@ class DashboardException(Exception):
         details: dict[str, Any] | None = None,
     ):
         """Initialize dashboard exception.
-        
+
         Args:
             message: Human-readable error message
             code: Error code from ErrorCode enum
@@ -203,4 +203,3 @@ class ConfigurationException(DashboardException):
         details: dict[str, Any] | None = None,
     ):
         super().__init__(message, code, status_code, details)
-

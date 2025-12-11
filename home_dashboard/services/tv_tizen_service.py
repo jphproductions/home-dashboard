@@ -28,7 +28,7 @@ async def wake(settings: Settings | None = None, tv_manager: TVStateManager | No
     """
     if settings is None:
         settings = get_settings()
-    
+
     ws = None
 
     try:
@@ -112,7 +112,7 @@ async def get_status(settings: Settings | None = None) -> bool:
     """
     if settings is None:
         settings = get_settings()
-    
+
     try:
         # This is a placeholder; actual power state detection via Tizen is unreliable
         # Try to connect as a simple test
