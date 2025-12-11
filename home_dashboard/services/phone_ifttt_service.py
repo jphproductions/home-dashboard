@@ -2,16 +2,17 @@
 
 import httpx
 from typing import Optional
-from home_dashboard.config import settings
+from home_dashboard.config import Settings, get_settings
 
 
-async def ring_phone(client: httpx.AsyncClient, message: Optional[str] = None) -> str:
+async def ring_phone(client: httpx.AsyncClient, message: Optional[str] = None, settings: Settings | None = None) -> str:
     """
     Trigger IFTTT webhook to ring Jamie's phone.
 
     Args:
         client: Shared HTTP client from dependency injection.
         message: Optional custom message (not used for basic ring, but for logging).
+        settings: Settings instance (defaults to singleton)
 
     Returns:
         Status message.
@@ -19,6 +20,8 @@ async def ring_phone(client: httpx.AsyncClient, message: Optional[str] = None) -
     Raises:
         Exception if webhook call fails.
     """
+    if settings is None:
+        settings = get_settings()
     webhook_url = f"https://maker.ifttt.com/trigger/{settings.ifttt_event_name}/with/key/{settings.ifttt_webhook_key}"
 
     try:

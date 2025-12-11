@@ -10,7 +10,7 @@ from fastapi.responses import RedirectResponse, HTMLResponse
 
 from home_dashboard.dependencies import get_http_client
 from home_dashboard.services import spotify_service
-from home_dashboard.config import settings
+from home_dashboard.config import Settings, get_settings
 from home_dashboard.views.template_renderer import TemplateRenderer
 
 router = APIRouter()
@@ -116,6 +116,7 @@ async def next_track(
     request: Request,
     client: httpx.AsyncClient = Depends(get_http_client),
     format: Literal["json", "html"] = Query(default="html", description="Response format"),
+    settings: Settings = Depends(get_settings),
 ):
     """Skip to next track.
 
@@ -144,6 +145,7 @@ async def previous_track(
     request: Request,
     client: httpx.AsyncClient = Depends(get_http_client),
     format: Literal["json", "html"] = Query(default="html", description="Response format"),
+    settings: Settings = Depends(get_settings),
 ):
     """Go to previous track.
 
@@ -269,7 +271,7 @@ async def auth_status(
 
 
 @router.get("/auth/login")
-async def auth_login():
+async def auth_login(settings: Settings = Depends(get_settings)):
     """Initiate Spotify OAuth flow."""
     # Generate random state for CSRF protection
     state = secrets.token_urlsafe(32)
@@ -296,6 +298,7 @@ async def auth_callback(
     state: str | None = None,
     error: str | None = None,
     client: httpx.AsyncClient = Depends(get_http_client),
+    settings: Settings = Depends(get_settings),
 ):
     """Handle Spotify OAuth callback."""
     # Check for errors

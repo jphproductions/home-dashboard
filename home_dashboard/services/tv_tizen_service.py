@@ -2,18 +2,21 @@
 
 import json
 import websockets
-from home_dashboard.config import settings
+from home_dashboard.config import Settings, get_settings
 
 
 # Simple in-memory state tracker
 _wake_failure_count = 0
 
 
-async def wake() -> str:
+async def wake(settings: Settings | None = None) -> str:
     """
     Send KEY_POWER to TV to wake it (toggle power).
 
     Uses WebSocket to Tizen TV API.
+
+    Args:
+        settings: Settings instance (defaults to singleton)
 
     Returns:
         Status message.
@@ -21,6 +24,9 @@ async def wake() -> str:
     Raises:
         Exception if connection fails.
     """
+    if settings is None:
+        settings = get_settings()
+    
     global _wake_failure_count
     ws = None
 

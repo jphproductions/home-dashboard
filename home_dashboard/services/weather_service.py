@@ -1,18 +1,19 @@
 """Weather service for OpenWeatherMap API integration."""
 
 import httpx
-from home_dashboard.config import settings
+from home_dashboard.config import Settings, get_settings
 from home_dashboard.models.weather import CurrentWeather, WeatherResponse
 
 
 OPENWEATHER_URL = "https://api.openweathermap.org/data/2.5/weather"
 
 
-async def get_current_weather(client: httpx.AsyncClient) -> WeatherResponse:
+async def get_current_weather(client: httpx.AsyncClient, settings: Settings | None = None) -> WeatherResponse:
     """Get current weather from OpenWeatherMap API.
 
     Args:
         client: Shared HTTP client for making requests
+        settings: Settings instance (defaults to singleton)
 
     Returns:
         WeatherResponse with formatted weather data
@@ -20,6 +21,8 @@ async def get_current_weather(client: httpx.AsyncClient) -> WeatherResponse:
     Raises:
         httpx.HTTPError: If API request fails
     """
+    if settings is None:
+        settings = get_settings()
     params: dict[str, str | float] = {
         "lat": str(settings.weather_latitude),
         "lon": str(settings.weather_longitude),

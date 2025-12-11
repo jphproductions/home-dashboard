@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 import httpx
 
 from home_dashboard.services import spotify_service, weather_service
-from home_dashboard.config import settings
+from home_dashboard.config import Settings, get_settings
 
 
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
@@ -27,18 +27,23 @@ class TemplateRenderer:
     async def render_spotify_tile(
         request: Request,
         client: httpx.AsyncClient,
+        settings: Settings | None = None,
     ) -> HTMLResponse:
         """Render Spotify tile fragment.
 
         Args:
             request: FastAPI request object
             client: HTTP client for API calls
+            settings: Settings instance (defaults to singleton)
 
         Returns:
             HTMLResponse with rendered Spotify tile
         """
+        if settings is None:
+            settings = get_settings()
+        
         # Check authentication
-        authenticated = spotify_service.is_authenticated()
+        authenticated = spotify_service.is_authenticated(settings)
 
         if not authenticated:
             return templates.TemplateResponse(
@@ -51,7 +56,7 @@ class TemplateRenderer:
 
         # Get current track status
         try:
-            track_data = await spotify_service.get_current_track(client)
+            track_data = await spotify_service.get_current_track(client, settings)
         except Exception:
             track_data = None
 
