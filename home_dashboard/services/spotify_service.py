@@ -7,13 +7,11 @@ from pathlib import Path
 from home_dashboard.config import Settings, get_settings
 from home_dashboard.models import SpotifyStatus
 from home_dashboard.services import tv_tizen_service
+from home_dashboard.state_managers import SpotifyAuthManager
 
 
-# Token cache with expiration tracking (protected by lock)
-_access_token = None
-_token_expires_at = 0
-_token_lock = threading.Lock()
-
+# NOTE: Global variables are deprecated and will be removed in future
+# Use SpotifyAuthManager via dependency injection instead
 # Path to store refresh token persistently
 TOKEN_FILE = Path.home() / ".spotify_refresh_token"
 
@@ -48,7 +46,11 @@ def is_authenticated(settings: Settings | None = None) -> bool:
     return _load_refresh_token() is not None or bool(settings.spotify_refresh_token)
 
 
-async def _get_access_token(client: httpx.AsyncClient, settings: Settings | None = None) -> str:
+async def _get_access_token(
+    client: httpx.AsyncClient, 
+    auth_manager: SpotifyAuthManager,
+    settings: Settings | None = None
+) -> str:
     """
     Get Spotify access token using refresh token flow.
 
@@ -56,6 +58,7 @@ async def _get_access_token(client: httpx.AsyncClient, settings: Settings | None
 
     Args:
         client: Shared HTTP client from dependency injection.
+        auth_manager: Spotify authentication state manager
         settings: Settings instance (defaults to singleton)
 
     Returns:
@@ -67,49 +70,50 @@ async def _get_access_token(client: httpx.AsyncClient, settings: Settings | None
     if settings is None:
         settings = get_settings()
     
-    global _access_token, _token_expires_at
+    # Check if we have a valid cached token
+    cached_token = await auth_manager.get_token()
+    if cached_token:
+        return cached_token
 
-    # Thread-safe token refresh
-    with _token_lock:
-        # Check again inside lock (double-checked locking pattern)
-        if _access_token and time.time() < (_token_expires_at - 60):
-            return _access_token
+    # Get refresh token from file or settings
+    refresh_token = _load_refresh_token() or settings.spotify_refresh_token
+    if not refresh_token:
+        raise Exception("No refresh token available. Please authenticate first.")
 
-        # Get refresh token from file or settings
-        refresh_token = _load_refresh_token() or settings.spotify_refresh_token
-        if not refresh_token:
-            raise Exception("No refresh token available. Please authenticate first.")
+    try:
+        response = await client.post(
+            "https://accounts.spotify.com/api/token",
+            auth=(settings.spotify_client_id, settings.spotify_client_secret),
+            data={"grant_type": "refresh_token", "refresh_token": refresh_token},
+            timeout=10.0,
+        )
+        response.raise_for_status()
+        data = response.json()
 
-        try:
-            response = await client.post(
-                "https://accounts.spotify.com/api/token",
-                auth=(settings.spotify_client_id, settings.spotify_client_secret),
-                data={"grant_type": "refresh_token", "refresh_token": refresh_token},
-                timeout=10.0,
-            )
-            response.raise_for_status()
-            data = response.json()
+        access_token = data["access_token"]
+        expires_in = data.get("expires_in", 3600)
+        
+        # Store in manager
+        await auth_manager.set_token(access_token, expires_in)
 
-            _access_token = data["access_token"]
-            _token_expires_at = time.time() + data.get("expires_in", 3600)
+        # If a new refresh token is provided, save it
+        if "refresh_token" in data:
+            _save_refresh_token(data["refresh_token"])
 
-            # If a new refresh token is provided, save it
-            if "refresh_token" in data:
-                _save_refresh_token(data["refresh_token"])
-
-            return _access_token
-        except httpx.HTTPError as e:
-            raise Exception(f"Spotify auth error: {str(e)}") from e
-        except (KeyError, ValueError) as e:
-            raise Exception(f"Invalid Spotify auth response: {str(e)}") from e
+        return access_token
+    except httpx.HTTPError as e:
+        raise Exception(f"Spotify auth error: {str(e)}") from e
+    except (KeyError, ValueError) as e:
+        raise Exception(f"Invalid Spotify auth response: {str(e)}") from e
 
 
-async def get_current_track(client: httpx.AsyncClient, settings: Settings | None = None) -> SpotifyStatus:
+async def get_current_track(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, settings: Settings | None = None) -> SpotifyStatus:
     """
     Get current playback state on Spotify.
 
     Args:
         client: Shared HTTP client from dependency injection.
+        auth_manager: Spotify authentication state manager
         settings: Settings instance (defaults to singleton)
 
     Returns:
@@ -122,7 +126,7 @@ async def get_current_track(client: httpx.AsyncClient, settings: Settings | None
         settings = get_settings()
     
     try:
-        token = await _get_access_token(client, settings)
+        token = await _get_access_token(client, auth_manager, settings)
         response = await client.get(
             "https://api.spotify.com/v1/me/player",
             headers={"Authorization": f"Bearer {token}"},
@@ -147,18 +151,19 @@ async def get_current_track(client: httpx.AsyncClient, settings: Settings | None
         raise Exception(f"Spotify playback state error: {str(e)}") from e
 
 
-async def play(client: httpx.AsyncClient, settings: Settings | None = None) -> None:
+async def play(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, settings: Settings | None = None) -> None:
     """Resume playback on Spotify.
 
     Args:
         client: Shared HTTP client from dependency injection.
+        auth_manager: Spotify authentication state manager
         settings: Settings instance (defaults to singleton)
     """
     if settings is None:
         settings = get_settings()
     
     try:
-        token = await _get_access_token(client, settings)
+        token = await _get_access_token(client, auth_manager, settings)
         response = await client.put(
             "https://api.spotify.com/v1/me/player/play",
             headers={"Authorization": f"Bearer {token}"},
@@ -169,18 +174,19 @@ async def play(client: httpx.AsyncClient, settings: Settings | None = None) -> N
         raise Exception(f"Spotify play error: {str(e)}") from e
 
 
-async def pause(client: httpx.AsyncClient, settings: Settings | None = None) -> None:
+async def pause(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, settings: Settings | None = None) -> None:
     """Pause playback on Spotify.
 
     Args:
         client: Shared HTTP client from dependency injection.
+        auth_manager: Spotify authentication state manager
         settings: Settings instance (defaults to singleton)
     """
     if settings is None:
         settings = get_settings()
     
     try:
-        token = await _get_access_token(client, settings)
+        token = await _get_access_token(client, auth_manager, settings)
         response = await client.put(
             "https://api.spotify.com/v1/me/player/pause",
             headers={"Authorization": f"Bearer {token}"},
@@ -191,18 +197,19 @@ async def pause(client: httpx.AsyncClient, settings: Settings | None = None) -> 
         raise Exception(f"Spotify pause error: {str(e)}") from e
 
 
-async def next_track(client: httpx.AsyncClient, settings: Settings | None = None) -> None:
+async def next_track(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, settings: Settings | None = None) -> None:
     """Skip to next track.
 
     Args:
         client: Shared HTTP client from dependency injection.
+        auth_manager: Spotify authentication state manager
         settings: Settings instance (defaults to singleton)
     """
     if settings is None:
         settings = get_settings()
     
     try:
-        token = await _get_access_token(client, settings)
+        token = await _get_access_token(client, auth_manager, settings)
         response = await client.post(
             "https://api.spotify.com/v1/me/player/next",
             headers={"Authorization": f"Bearer {token}"},
@@ -213,18 +220,19 @@ async def next_track(client: httpx.AsyncClient, settings: Settings | None = None
         raise Exception(f"Spotify next error: {str(e)}") from e
 
 
-async def previous_track(client: httpx.AsyncClient, settings: Settings | None = None) -> None:
+async def previous_track(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, settings: Settings | None = None) -> None:
     """Go to previous track.
 
     Args:
         client: Shared HTTP client from dependency injection.
+        auth_manager: Spotify authentication state manager
         settings: Settings instance (defaults to singleton)
     """
     if settings is None:
         settings = get_settings()
     
     try:
-        token = await _get_access_token(client, settings)
+        token = await _get_access_token(client, auth_manager, settings)
         response = await client.post(
             "https://api.spotify.com/v1/me/player/previous",
             headers={"Authorization": f"Bearer {token}"},
@@ -235,7 +243,7 @@ async def previous_track(client: httpx.AsyncClient, settings: Settings | None = 
         raise Exception(f"Spotify previous error: {str(e)}") from e
 
 
-async def wake_tv_and_play(client: httpx.AsyncClient, settings: Settings | None = None) -> str:
+async def wake_tv_and_play(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, tv_manager: 'TVStateManager', settings: Settings | None = None) -> str:
     """
     Wake TV and transfer current playback to TV device.
 
@@ -245,6 +253,8 @@ async def wake_tv_and_play(client: httpx.AsyncClient, settings: Settings | None 
 
     Args:
         client: Shared HTTP client from dependency injection.
+        auth_manager: Spotify authentication state manager
+        tv_manager: TV state manager (for failure tracking)
         settings: Settings instance (defaults to singleton)
 
     Returns:
@@ -258,10 +268,10 @@ async def wake_tv_and_play(client: httpx.AsyncClient, settings: Settings | None 
     
     try:
         # Wake TV first
-        await tv_tizen_service.wake(settings)
+        await tv_tizen_service.wake(settings, tv_manager)
 
         # Transfer playback to TV device
-        token = await _get_access_token(client, settings)
+        token = await _get_access_token(client, auth_manager, settings)
         response = await client.put(
             "https://api.spotify.com/v1/me/player",
             headers={"Authorization": f"Bearer {token}"},
@@ -275,13 +285,14 @@ async def wake_tv_and_play(client: httpx.AsyncClient, settings: Settings | None 
         raise Exception(f"Wake and play error: {str(e)}") from e
 
 
-async def play_playlist(client: httpx.AsyncClient, playlist_uri: str, settings: Settings | None = None) -> None:
+async def play_playlist(client: httpx.AsyncClient, playlist_uri: str, auth_manager: SpotifyAuthManager, settings: Settings | None = None) -> None:
     """
     Start playing a playlist.
 
     Args:
         client: Shared HTTP client from dependency injection.
         playlist_uri: Spotify URI of the playlist (spotify:playlist:xxx).
+        auth_manager: Spotify authentication state manager
         settings: Settings instance (defaults to singleton)
 
     Raises:
@@ -291,7 +302,7 @@ async def play_playlist(client: httpx.AsyncClient, playlist_uri: str, settings: 
         settings = get_settings()
     
     try:
-        token = await _get_access_token(client, settings)
+        token = await _get_access_token(client, auth_manager, settings)
         response = await client.put(
             "https://api.spotify.com/v1/me/player/play",
             headers={"Authorization": f"Bearer {token}"},

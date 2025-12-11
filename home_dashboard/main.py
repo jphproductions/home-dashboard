@@ -21,6 +21,7 @@ from home_dashboard.routers import (
 )
 from home_dashboard.models import HealthResponse
 from home_dashboard.exceptions import DashboardException
+from home_dashboard.state_managers import SpotifyAuthManager, TVStateManager
 import re
 
 # Configure logging
@@ -121,6 +122,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.http_client = client
     logger.info("HTTP client initialized successfully")
 
+    # Initialize state managers
+    app.state.spotify_auth_manager = SpotifyAuthManager()
+    app.state.tv_state_manager = TVStateManager()
+    await app.state.spotify_auth_manager.initialize()
+    await app.state.tv_state_manager.initialize()
+    logger.info("State managers initialized")
+
     try:
         yield
     except Exception as e:
@@ -131,6 +139,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     finally:
         # Cleanup always runs, even if exception was raised
         logger.info("Shutting down Home Dashboard application")
+        
+        # Cleanup state managers
+        await app.state.spotify_auth_manager.cleanup()
+        await app.state.tv_state_manager.cleanup()
+        logger.info("State managers cleaned up")
+        
         await client.aclose()
         logger.info("HTTP client closed")
 

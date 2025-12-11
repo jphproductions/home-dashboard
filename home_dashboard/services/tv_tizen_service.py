@@ -3,13 +3,13 @@
 import json
 import websockets
 from home_dashboard.config import Settings, get_settings
+from home_dashboard.state_managers import TVStateManager
 
 
-# Simple in-memory state tracker
-_wake_failure_count = 0
+# NOTE: Global state is deprecated - use TVStateManager via dependency injection
 
 
-async def wake(settings: Settings | None = None) -> str:
+async def wake(settings: Settings | None = None, tv_manager: TVStateManager | None = None) -> str:
     """
     Send KEY_POWER to TV to wake it (toggle power).
 
@@ -17,6 +17,7 @@ async def wake(settings: Settings | None = None) -> str:
 
     Args:
         settings: Settings instance (defaults to singleton)
+        tv_manager: TV state manager for failure tracking (optional)
 
     Returns:
         Status message.
@@ -27,7 +28,6 @@ async def wake(settings: Settings | None = None) -> str:
     if settings is None:
         settings = get_settings()
     
-    global _wake_failure_count
     ws = None
 
     try:
@@ -66,16 +66,22 @@ async def wake(settings: Settings | None = None) -> str:
         }
         await ws.send(json.dumps(key_command))
 
-        _wake_failure_count = 0
+        # Reset failure count on success
+        if tv_manager:
+            await tv_manager.reset_wake_failures()
         return "KEY_POWER sent to TV"
 
     except Exception as e:
-        _wake_failure_count += 1
-        print(f"TV wake failed (attempt {_wake_failure_count}): {str(e)}")
+        # Track failure
+        if tv_manager:
+            count = await tv_manager.increment_wake_failure()
+            print(f"TV wake failed (attempt {count}): {str(e)}")
 
-        # Optional: escalate to phone notification after N failures
-        if _wake_failure_count >= 5:
-            print("TV wake failed 5+ times, consider escalating")
+            # Optional: escalate to phone notification after N failures
+            if count >= 5:
+                print("TV wake failed 5+ times, consider escalating")
+        else:
+            print(f"TV wake failed: {str(e)}")
 
         raise Exception(f"Tizen wake error: {str(e)}") from e
     finally:
