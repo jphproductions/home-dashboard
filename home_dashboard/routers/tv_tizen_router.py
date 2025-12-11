@@ -4,8 +4,9 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query
 import httpx
 
-from home_dashboard.dependencies import get_http_client
+from home_dashboard.dependencies import get_http_client, get_tv_state_manager
 from home_dashboard.services import tv_tizen_service
+from home_dashboard.state_managers import TVStateManager
 
 router = APIRouter()
 
@@ -13,19 +14,21 @@ router = APIRouter()
 @router.post("/wake")
 async def wake_tv(
     client: httpx.AsyncClient = Depends(get_http_client),
+    tv_manager: TVStateManager = Depends(get_tv_state_manager),
     format: Literal["json", "html"] = Query(default="json", description="Response format"),
 ):
     """Send Wake-on-LAN packet to TV.
 
     Args:
         client: HTTP client from dependency injection
+        tv_manager: TV state manager from dependency injection
         format: Response format - 'json' for API (html not applicable for this endpoint)
 
     Returns:
         JSON with status
     """
     try:
-        result = await tv_tizen_service.wake()
+        result = await tv_tizen_service.wake(tv_manager=tv_manager)
         return {"status": "wol_sent", "action": "wake_tv", "message": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"TV wake error: {str(e)}") from e

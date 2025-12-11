@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -9,6 +10,9 @@ import httpx
 
 from home_dashboard.services import spotify_service, weather_service
 from home_dashboard.config import Settings, get_settings
+
+if TYPE_CHECKING:
+    from home_dashboard.state_managers import SpotifyAuthManager
 
 
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
@@ -27,6 +31,7 @@ class TemplateRenderer:
     async def render_spotify_tile(
         request: Request,
         client: httpx.AsyncClient,
+        auth_manager: 'SpotifyAuthManager',
         settings: Settings | None = None,
     ) -> HTMLResponse:
         """Render Spotify tile fragment.
@@ -34,6 +39,7 @@ class TemplateRenderer:
         Args:
             request: FastAPI request object
             client: HTTP client for API calls
+            auth_manager: Spotify authentication manager
             settings: Settings instance (defaults to singleton)
 
         Returns:
@@ -56,7 +62,7 @@ class TemplateRenderer:
 
         # Get current track status
         try:
-            track_data = await spotify_service.get_current_track(client, settings)
+            track_data = await spotify_service.get_current_track(client, auth_manager, settings)
         except Exception:
             track_data = None
 

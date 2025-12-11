@@ -4,8 +4,9 @@ from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse
 import httpx
 
-from home_dashboard.dependencies import get_http_client
+from home_dashboard.dependencies import get_http_client, get_spotify_auth_manager
 from home_dashboard.views.template_renderer import TemplateRenderer
+from home_dashboard.state_managers import SpotifyAuthManager
 
 router = APIRouter()
 
@@ -17,9 +18,13 @@ async def index(request: Request):
 
 
 @router.get("/tiles/spotify", response_class=HTMLResponse)
-async def spotify_tile(request: Request, client: httpx.AsyncClient = Depends(get_http_client)):
+async def spotify_tile(
+    request: Request,
+    client: httpx.AsyncClient = Depends(get_http_client),
+    auth_manager: SpotifyAuthManager = Depends(get_spotify_auth_manager),
+):
     """Render Spotify tile fragment."""
-    return await TemplateRenderer.render_spotify_tile(request, client)
+    return await TemplateRenderer.render_spotify_tile(request, client, auth_manager)
 
 
 @router.get("/tiles/weather", response_class=HTMLResponse)
