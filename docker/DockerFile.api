@@ -1,17 +1,19 @@
 FROM python:3.11-slim
 
-WORKDIR /app
+WORKDIR /code
 
 # Install Poetry
 RUN pip install --no-cache-dir poetry
 
-# Copy home dashboard app
-COPY home_dashboard /app/home_dashboard
-COPY playlists.json /app/playlists.json
+# Copy pyproject.toml and poetry.lock for dependency installation
+COPY pyproject.toml poetry.lock ./
 
 # Install dependencies
-WORKDIR /app/home_dashboard
 RUN poetry install --no-dev
+
+# Copy home dashboard app
+COPY home_dashboard /code/home_dashboard
+COPY playlists.json /code/playlists.json
 
 # Expose port
 EXPOSE 8000
