@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 
+from home_dashboard.cache import cached, get_cache
 from home_dashboard.config import Settings, get_settings
 from home_dashboard.exceptions import (
     SpotifyAPIException,
@@ -24,6 +25,9 @@ if TYPE_CHECKING:
 # Use SpotifyAuthManager via dependency injection instead
 # Path to store refresh token persistently
 TOKEN_FILE = Path.home() / ".spotify_refresh_token"
+
+# Cache configuration
+SPOTIFY_STATUS_CACHE_TTL = 5  # 5 seconds - status changes frequently
 
 
 def _load_refresh_token() -> str | None:
@@ -131,7 +135,9 @@ async def get_current_track(
     client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, settings: Settings | None = None
 ) -> SpotifyStatus:
     """
-    Get current playback state on Spotify.
+    Get current playback state on Spotify with caching.
+
+    Results are cached for 5 seconds to reduce API calls while maintaining responsiveness.
 
     Args:
         client: Shared HTTP client from dependency injection.
@@ -139,43 +145,50 @@ async def get_current_track(
         settings: Settings instance (defaults to singleton)
 
     Returns:
-        SpotifyStatus with current track and playback info.
+        SpotifyStatus with current track and playback info (may be cached).
 
     Raises:
-        Exception if API call fails.
+        SpotifyAPIException: If API call fails.
     """
     if settings is None:
         settings = get_settings()
 
-    try:
-        token = await _get_access_token(client, auth_manager, settings)
-        response = await client.get(
-            "https://api.spotify.com/v1/me/player",
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=10.0,
-        )
-        response.raise_for_status()
-        data = response.json() if response.status_code != 204 else {}
+    cache_key = "spotify:current_track"
 
-        is_playing = data.get("is_playing", False)
-        item = data.get("item") or {}
-        device = data.get("device") or {}
+    async def fetch_current_track() -> SpotifyStatus:
+        """Fetch fresh playback status from Spotify API."""
+        try:
+            token = await _get_access_token(client, auth_manager, settings)
+            response = await client.get(
+                "https://api.spotify.com/v1/me/player",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            data = response.json() if response.status_code != 204 else {}
 
-        return SpotifyStatus(
-            is_playing=is_playing,
-            track_name=item.get("name"),
-            artist_name=item.get("artists", [{}])[0].get("name") if item.get("artists") else None,
-            device_name=device.get("name"),
-            progress_ms=data.get("progress_ms"),
-            duration_ms=item.get("duration_ms") if item else None,
-        )
-    except httpx.HTTPError as e:
-        status_code = e.response.status_code if hasattr(e, "response") else 502
-        raise SpotifyAPIException(
-            f"Failed to get playback state: {str(e)}",
-            status_code=status_code,
-            details={"operation": "get_current_track"},
-        ) from e
+            is_playing = data.get("is_playing", False)
+            item = data.get("item") or {}
+            device = data.get("device") or {}
+
+            return SpotifyStatus(
+                is_playing=is_playing,
+                track_name=item.get("name"),
+                artist_name=item.get("artists", [{}])[0].get("name") if item.get("artists") else None,
+                device_name=device.get("name"),
+                progress_ms=data.get("progress_ms"),
+                duration_ms=item.get("duration_ms") if item else None,
+            )
+        except httpx.HTTPError as e:
+            status_code = e.response.status_code if hasattr(e, "response") else 502
+            raise SpotifyAPIException(
+                f"Failed to get playback state: {str(e)}",
+                status_code=status_code,
+                details={"operation": "get_current_track"},
+            ) from e
+
+    # Use cached wrapper
+    return await cached(get_cache(), cache_key, SPOTIFY_STATUS_CACHE_TTL, fetch_current_track)
 
 
 async def play(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, settings: Settings | None = None) -> None:

@@ -21,9 +21,6 @@ slowapi = "^0.1.9"
 python-json-logger = "^3.2.1"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.3.0"
-pytest-asyncio = "^0.24.0"
-pytest-cov = "^6.0.0"
 ruff = "^0.14.0"
 mypy = "^1.13.0"
 pre-commit = "^4.0.0"
@@ -31,10 +28,6 @@ pre-commit = "^4.0.0"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["."]
 
 [tool.ruff]
 line-length = 120
@@ -74,7 +67,3 @@ warn_no_return = true
 warn_unreachable = true
 strict_equality = true
 ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "tests.*"
-disallow_untyped_defs = false

@@ -10,6 +10,8 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -27,6 +29,7 @@ from home_dashboard.routers import (
     view_router,
     weather_router,
 )
+from home_dashboard.security import get_cors_origins, get_trusted_hosts
 from home_dashboard.state_managers import SpotifyAuthManager, TVStateManager
 
 # Configure structured logging (JSON to file + console)
@@ -222,6 +225,38 @@ app = FastAPI(
     description="Control TV, Spotify, weather, and phone",
     version=__version__,
     lifespan=lifespan,
+)
+
+# Add security middleware
+# CORS - restrict to local network
+cors_origins = get_cors_origins()
+log_with_context(
+    logger,
+    "info",
+    "Configuring CORS middleware",
+    event_type="security_config",
+    origins=cors_origins,
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Trusted hosts - prevent host header injection
+trusted_hosts = get_trusted_hosts()
+log_with_context(
+    logger,
+    "info",
+    "Configuring TrustedHost middleware",
+    event_type="security_config",
+    hosts=trusted_hosts,
+)
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=trusted_hosts,
 )
 
 # Add rate limiter to app state

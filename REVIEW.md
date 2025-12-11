@@ -7,6 +7,7 @@
 **Overall Grade:** D-
 
 **Documentation Sources:**
+
 - FastAPI 0.122.0 official docs
 - Pydantic 2.12.5 official docs
 - httpx 0.27.2 official docs
@@ -45,12 +46,14 @@ home-dashboard/
 ```
 
 **Why This Sucks:**
+
 - You have a nested `home_dashboard/home_dashboard/` structure that serves NO PURPOSE
 - Your `pyproject.toml` is in `home_dashboard/` but Python code is in `home_dashboard/home_dashboard/`
 - Tests are at the root but reference `home_dashboard` which is confusing
 - Docker builds copy `home_dashboard` and then run from within it
 
 **The Right Way:**
+
 ```
 home-dashboard/               # Project root
 ├── pyproject.toml           # Python config at root
@@ -68,6 +71,7 @@ home-dashboard/               # Project root
 ```
 
 **OR** use a flat structure:
+
 ```
 home-dashboard/
 ├── pyproject.toml
@@ -80,6 +84,7 @@ home-dashboard/
 ```
 
 **References:**
+
 - [Python Packaging User Guide](https://packaging.python.org/en/latest/tutorials/packaging-projects/)
 - [Structuring Your Project (The Hitchhiker's Guide to Python)](https://docs.python-guide.org/writing/structure/)
 
@@ -89,15 +94,18 @@ home-dashboard/
 
 **Problem:** Your settings are a tangled mess of validation issues, wrong defaults, and poor practices.
 
-#### Issues in `config.py`:
+#### Issues in `config.py`
 
 1. **Hardcoded BASE_DIR calculation is fragile:**
+
 ```python
 BASE_DIR = Path(__file__).resolve().parents[2]  # home-dashboard/
 ```
+
 This assumes a specific directory depth. If you restructure (which you SHOULD), this breaks.
 
 2. **You're loading `playlists.json` as a "property" lazily:**
+
 ```python
 @property
 def spotify_favorite_playlists(self) -> list[dict]:
@@ -105,17 +113,21 @@ def spotify_favorite_playlists(self) -> list[dict]:
         with open(BASE_DIR / "playlists.json", "r", encoding="utf-8") as f:
             return json.load(f)
 ```
+
 This is loaded ON EVERY ACCESS! No caching! Want to access playlists 100 times? Enjoy reading the file 100 times!
 
 3. **Settings validation is incomplete:**
+
 - No validation for IP addresses (`tv_ip`)
 - No validation for API keys (could be empty strings)
 - No validation for IFTTT webhook format
 
 4. **`.env.example` has wrong/inconsistent values:**
+
 ```dotenv
 SPOTIFY_REDIRECT_URI=http://localhost:8501/callback  # Says 8501 (Streamlit port?)
 ```
+
 But your app runs on port 8000!
 
 **The Right Way (Per Pydantic 2.12.5 Official Docs):**
@@ -220,6 +232,7 @@ def get_settings() -> Settings:
 ```
 
 **Why This Follows Pydantic v2 Best Practices:**
+
 1. ✅ Uses `model_config = SettingsConfigDict(...)` (v2 API) instead of `class Config`
 2. ✅ Uses `@field_validator` decorator (v2 API) instead of deprecated `@validator`
 3. ✅ Uses `cached_property` for expensive operations (official recommendation)
@@ -237,6 +250,7 @@ def get_settings() -> Settings:
 **CRITICAL:** You're using FastAPI 0.122.1, which introduced **BREAKING CHANGES** in version 0.122.0 regarding dependencies with `yield`.
 
 **Your Current Code in `main.py`:**
+
 ```python
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -262,6 +276,7 @@ async def lifespan(app: FastAPI):
 > **Breaking Change:** Dependencies with `yield` must now **RE-RAISE exceptions** after the yield point. Catching and suppressing exceptions causes resource cleanup to fail and results in memory leaks!
 
 **Why Your Code Will Break:**
+
 1. ❌ Your `except Exception` catches and logs errors but doesn't re-raise
 2. ❌ FastAPI 0.122.0+ expects exceptions to propagate for proper cleanup
 3. ❌ Suppressed exceptions prevent other context managers from cleaning up
@@ -320,6 +335,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 ```
 
 **Key Changes for FastAPI 0.122.0+:**
+
 1. ✅ **MUST re-raise exceptions** after `yield` - this is the breaking change!
 2. ✅ Use `AsyncIterator[None]` type hint for lifespan function
 3. ✅ Configure httpx.Timeout with granular timeouts (connect/read/write/pool)
@@ -351,6 +367,7 @@ limits = httpx.Limits(max_keepalive_connections=10, max_connections=100)
 ```
 
 **Why httpx Configuration Matters:**
+
 - `connect` timeout prevents hanging on unreachable hosts
 - `read` timeout prevents slow-read attacks
 - `write` timeout prevents hanging on slow uploads
@@ -358,6 +375,7 @@ limits = httpx.Limits(max_keepalive_connections=10, max_connections=100)
 - `keepalive_expiry` prevents stale connections
 
 **Testing Your Fix:**
+
 ```python
 # Test that exceptions are properly raised
 import pytest
@@ -374,9 +392,10 @@ def test_lifespan_exception_propagation():
 ```
 
 **Sources:**
-- FastAPI 0.122.0 Release Notes: https://github.com/fastapi/fastapi/releases/tag/0.122.0
-- httpx Timeout Configuration: https://www.python-httpx.org/advanced/timeouts/
-- httpx Connection Pooling: https://www.python-httpx.org/advanced/connection-pooling/
+
+- FastAPI 0.122.0 Release Notes: <https://github.com/fastapi/fastapi/releases/tag/0.122.0>
+- httpx Timeout Configuration: <https://www.python-httpx.org/advanced/timeouts/>
+- httpx Connection Pooling: <https://www.python-httpx.org/advanced/connection-pooling/>
 
 ---
 
@@ -385,6 +404,7 @@ def test_lifespan_exception_propagation():
 **Problem:** You're using module-level globals for state management in a MULTI-THREADED environment.
 
 In `spotify_service.py`:
+
 ```python
 _access_token = None
 _token_expires_at = 0
@@ -392,11 +412,13 @@ _token_lock = threading.Lock()
 ```
 
 In `tv_tizen_service.py`:
+
 ```python
 _wake_failure_count = 0
 ```
 
 **Why This Is Catastrophically Bad:**
+
 1. **Not asyncio-safe:** You're using `threading.Lock()` in an `async` application. This can cause deadlocks!
 2. **Global state is evil:** Impossible to test, impossible to reason about, impossible to reset
 3. **No persistence:** If the app restarts, you lose all state
@@ -407,6 +429,7 @@ _wake_failure_count = 0
 Use a proper state management pattern:
 
 #### Option A: Use FastAPI's app.state
+
 ```python
 # In main.py lifespan
 @asynccontextmanager
@@ -427,6 +450,7 @@ async def get_access_token(request: Request) -> str:
 ```
 
 #### Option B: Use Redis for shared state
+
 ```python
 from redis.asyncio import Redis
 
@@ -451,6 +475,7 @@ class SpotifyAuthManager:
 ```
 
 #### Option C: Use SQLite for persistence
+
 ```python
 from sqlalchemy import create_engine, Column, String, Integer, Float
 from sqlalchemy.orm import declarative_base, sessionmaker
@@ -475,6 +500,7 @@ class AuthToken(Base):
 ### 4. **SPOTIFY TOKEN STORAGE IS INSECURE AND WRONG**
 
 **Problem:**
+
 ```python
 TOKEN_FILE = Path.home() / ".spotify_refresh_token"
 
@@ -484,6 +510,7 @@ def _save_refresh_token(refresh_token: str) -> None:
 ```
 
 **Why This Sucks:**
+
 1. **Hardcoded path in home directory** - Won't work in Docker!
 2. **No encryption** - Token is stored in plain text
 3. **No atomic writes** - If app crashes during write, file is corrupted
@@ -493,6 +520,7 @@ def _save_refresh_token(refresh_token: str) -> None:
 **The Right Way:**
 
 For a home project:
+
 ```python
 import os
 from pathlib import Path
@@ -552,6 +580,7 @@ class TokenStore:
 ```
 
 Or better yet, just use environment variables and let the user manage secrets:
+
 ```python
 # Store refresh token in .env or use OAuth flow to get it interactively
 spotify_refresh_token: str = Field(
@@ -567,22 +596,28 @@ spotify_refresh_token: str = Field(
 **Problems:**
 
 1. **Dockerfile installs dev dependencies:**
+
 ```dockerfile
 RUN poetry install --no-dev  # ❌ Wrong flag!
 ```
+
 Should be `--only main` or `--without dev` in modern Poetry!
 
 2. **Docker Compose references wrong port in systemd:**
+
 ```systemd
 ExecStart=/usr/bin/chromium-browser --kiosk ... http://localhost:8501
 ```
+
 Your app runs on 8000, not 8501! (8501 is Streamlit, which you don't even use!)
 
 3. **Volume mount is wrong:**
+
 ```yaml
 volumes:
   - ~/.spotify_refresh_token:/root/.spotify_refresh_token
 ```
+
 This maps YOUR HOME to CONTAINER ROOT HOME. This will fail on multi-user systems or when running as non-root!
 
 4. **No health checks:**
@@ -665,6 +700,7 @@ CMD ["uvicorn", "home_dashboard.main:app", "--host", "0.0.0.0", "--port", "8000"
 ```
 
 **What Changed:**
+
 1. ✅ Multi-stage build reduces image size by ~200MB (leaves Poetry and build tools in builder)
 2. ✅ Uses `--only main` (modern Poetry flag, not deprecated `--no-dev`)
 3. ✅ Installs curl for healthchecks (more reliable than httpx in container)
@@ -675,8 +711,9 @@ CMD ["uvicorn", "home_dashboard.main:app", "--host", "0.0.0.0", "--port", "8000"
 8. ✅ Uses --workers 2 for better concurrency on Raspberry Pi 5
 
 **Sources:**
-- Docker multi-stage builds: https://docs.docker.com/build/building/multi-stage/
-- Microsoft FastAPI container guide: https://learn.microsoft.com/azure/developer/python/tutorial-containerize-simple-web-app
+
+- Docker multi-stage builds: <https://docs.docker.com/build/building/multi-stage/>
+- Microsoft FastAPI container guide: <https://learn.microsoft.com/azure/developer/python/tutorial-containerize-simple-web-app>
 
 ```yaml
 # docker-compose.yml
@@ -724,6 +761,7 @@ networks:
 ```
 
 And fix systemd service:
+
 ```systemd
 [Unit]
 Description=Chromium Kiosk Mode for Home Dashboard
@@ -757,6 +795,7 @@ except Exception as e:
 ```
 
 **Problems:**
+
 1. Catching `Exception` is too broad - you'll catch `KeyboardInterrupt`, `SystemExit`, etc.
 2. Re-raising as generic `Exception` loses type information
 3. `str(e)` is redundant - exceptions already have messages
@@ -1031,6 +1070,7 @@ def reset_global_state():
 ```
 
 You need:
+
 - ✅ Unit tests for ALL services (per pytest best practices: test in isolation)
 - ✅ Integration tests for API routes (per pytest: test component interactions)
 - ✅ E2E tests for critical user flows (per pytest: test full workflows)
@@ -1043,12 +1083,14 @@ You need:
 ### 8. **LOGGING IS INCONSISTENT AND USELESS**
 
 **Problems:**
+
 1. Sometimes you use `print()`, sometimes `logger.info()`, sometimes nothing
 2. No structured logging (good luck searching logs!)
 3. No log levels strategy
 4. Sensitive data in logs (API keys in URLs)
 
 **Examples of Bad Logging:**
+
 ```python
 print(f"TV handshake response: {response}")  # Use logger!
 ```
@@ -1151,6 +1193,7 @@ ws_url = f"wss://{settings.tv_ip}:8002/api/v2/channels/samsung.remote.control?na
 ```
 
 **Problems:**
+
 1. **No connection pooling** - You create a new WebSocket connection for EVERY command
 2. **No retry logic** - One network hiccup = failure
 3. **No timeout handling** - Can hang forever
@@ -1452,16 +1495,19 @@ async def ring_phone(request: Request, ...):
 ### 11. **Type Hints Are Inconsistent**
 
 Sometimes you have them:
+
 ```python
 async def get_current_track(client: httpx.AsyncClient) -> SpotifyStatus:
 ```
 
 Sometimes you don't:
+
 ```python
 def redact_sensitive_data(url: str) -> str:  # Missing return type
 ```
 
 Sometimes they're wrong:
+
 ```python
 def spotify_favorite_playlists(self) -> list[dict]:  # dict is too vague!
 ```
@@ -1484,6 +1530,7 @@ def spotify_favorite_playlists(self) -> list[PlaylistDict]:
 ```
 
 Run mypy:
+
 ```bash
 poetry add --group dev mypy types-httpx
 poetry run mypy home_dashboard
@@ -1525,6 +1572,7 @@ skip-magic-trailing-comma = false
 ```
 
 Add to `pyproject.toml`:
+
 ```toml
 [tool.ruff]
 line-length = 100
@@ -1535,6 +1583,7 @@ select = ["E", "W", "F", "I", "B", "C4", "UP", "ARG", "SIM"]
 ```
 
 Run before every commit:
+
 ```bash
 poetry run ruff check --fix home_dashboard
 poetry run ruff format home_dashboard
@@ -1591,6 +1640,7 @@ await asyncio.sleep(SleepDurations.SPOTIFY_STATE_UPDATE)
 ### 14. **README Is Misleading**
 
 Your README says:
+
 ```markdown
 ## API Documentation
 
@@ -1695,6 +1745,7 @@ Example `ARCHITECTURE.md`:
 ## System Overview
 
 ```
+
 ┌─────────────┐
 │   Browser   │ ← User
 └──────┬──────┘
@@ -1719,6 +1770,7 @@ Example `ARCHITECTURE.md`:
 │  - Spotify   │ │  - Samsung TV │
 │  - Weather   │ │  - IFTTT      │
 └──────────────┘ └───────────────┘
+
 ```
 
 ## Components
@@ -1766,12 +1818,14 @@ fastapi = "^0.122.0"  # Could install 0.999.0!
 **Fix:**
 
 1. Generate `poetry.lock` and commit it:
+
 ```bash
 poetry lock
 git add poetry.lock
 ```
 
 2. Use more restrictive version constraints for critical deps:
+
 ```toml
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -1806,6 +1860,7 @@ You have no metrics, no tracing, no monitoring!
 **Add:**
 
 1. **Prometheus metrics:**
+
 ```bash
 poetry add prometheus-fastapi-instrumentator
 ```
@@ -1820,6 +1875,7 @@ instrumentator.instrument(app).expose(app, endpoint="/metrics")
 2. **Structured logging (already mentioned)**
 
 3. **Health check with dependencies:**
+
 ```python
 @app.get("/health/live")
 async def liveness():
@@ -1970,6 +2026,7 @@ class CachedWeatherService:
 ```
 
 Or use Redis:
+
 ```python
 import redis.asyncio as redis
 
@@ -2034,6 +2091,7 @@ async def stream_spotify_status(
 Here's what you need to do, in order:
 
 ### Phase 1: Critical Fixes (Week 1)
+
 1. ✅ Fix project structure - flatten nested directories
 2. ✅ Fix Docker configuration - multi-stage build, health checks
 3. ✅ Fix configuration management - proper validation, caching
@@ -2041,6 +2099,7 @@ Here's what you need to do, in order:
 5. ✅ Add proper error handling with error codes
 
 ### Phase 2: Testing & Quality (Week 2)
+
 6. ✅ Write comprehensive unit tests (target 80% coverage)
 7. ✅ Add integration tests for all API routes
 8. ✅ Configure and run linters (ruff, mypy)
@@ -2048,6 +2107,7 @@ Here's what you need to do, in order:
 10. ✅ Set up CI/CD pipeline
 
 ### Phase 3: Security & Reliability (Week 3)
+
 11. ✅ Add rate limiting
 12. ✅ Add basic authentication
 13. ✅ Fix TV service with retry logic and connection management
@@ -2055,6 +2115,7 @@ Here's what you need to do, in order:
 15. ✅ Implement caching strategy
 
 ### Phase 4: Documentation & Monitoring (Week 4)
+
 16. ✅ Write comprehensive documentation (Architecture, Deployment, Development)
 17. ✅ Customize FastAPI OpenAPI docs
 18. ✅ Add metrics and health checks
@@ -2062,6 +2123,7 @@ Here's what you need to do, in order:
 20. ✅ Create troubleshooting guide
 
 ### Phase 5: Optimization (Week 5)
+
 21. ✅ Replace HTMX polling with SSE where appropriate
 22. ✅ Optimize Docker image size
 23. ✅ Add database for persistent state (SQLite or Redis)
@@ -2076,19 +2138,19 @@ You clearly need to level up your skills. Read these:
 1. **"The Pragmatic Programmer"** by Andrew Hunt & David Thomas
 2. **"Clean Code"** by Robert C. Martin
 3. **"Designing Data-Intensive Applications"** by Martin Kleppmann
-4. **FastAPI Documentation** - https://fastapi.tiangolo.com/
-5. **12-Factor App** - https://12factor.net/
-6. **Python Best Practices** - https://docs.python-guide.org/
+4. **FastAPI Documentation** - <https://fastapi.tiangolo.com/>
+5. **12-Factor App** - <https://12factor.net/>
+6. **Python Best Practices** - <https://docs.python-guide.org/>
 
 ---
 
 ## 🎓 LEARNING RESOURCES
 
-- **FastAPI Tutorial:** https://fastapi.tiangolo.com/tutorial/
-- **Pydantic Documentation:** https://docs.pydantic.dev/
-- **Docker Best Practices:** https://docs.docker.com/develop/dev-best-practices/
-- **Python Testing with pytest:** https://docs.pytest.org/
-- **Async Python:** https://realpython.com/async-io-python/
+- **FastAPI Tutorial:** <https://fastapi.tiangolo.com/tutorial/>
+- **Pydantic Documentation:** <https://docs.pydantic.dev/>
+- **Docker Best Practices:** <https://docs.docker.com/develop/dev-best-practices/>
+- **Python Testing with pytest:** <https://docs.pytest.org/>
+- **Async Python:** <https://realpython.com/async-io-python/>
 
 ---
 
@@ -2103,6 +2165,7 @@ Based on official documentation for your installed versions, here are the **BREA
 **Impact:** Your current lifespan function suppresses exceptions, which causes **MEMORY LEAKS** in FastAPI 0.122.0+!
 
 **Fix Required:**
+
 ```python
 # ❌ BROKEN in FastAPI 0.122.0+
 try:
@@ -2126,6 +2189,7 @@ except Exception as e:
 **Issue:** You're using deprecated Pydantic v1 patterns instead of v2 API.
 
 **Fixes Required:**
+
 - ❌ `class Config:` → ✅ `model_config = ConfigDict(...)`
 - ❌ `@validator` → ✅ `@field_validator`
 - ❌ `@property` for expensive ops → ✅ `@cached_property`
@@ -2139,11 +2203,13 @@ except Exception as e:
 **Issue:** You're using simplistic timeout configuration.
 
 **Current (BAD):**
+
 ```python
 timeout=10.0  # Single timeout for everything
 ```
 
 **Should Be (GOOD):**
+
 ```python
 timeout=httpx.Timeout(
     connect=5.0,  # Connection timeout
@@ -2162,11 +2228,13 @@ timeout=httpx.Timeout(
 **Issue:** You're using `ssl=False` instead of proper SSL context.
 
 **Current (BAD):**
+
 ```python
 websockets.connect(url, ssl=False)  # Deprecated and insecure
 ```
 
 **Should Be (GOOD):**
+
 ```python
 ssl_context = ssl.create_default_context()
 ssl_context.verify_mode = ssl.CERT_NONE
@@ -2194,6 +2262,7 @@ websockets.connect(url, ssl=ssl_context)  # Proper way
 **Impact:** 0% test coverage = guaranteed bugs in production.
 
 **Fixes Required:**
+
 - ✅ Use pytest fixtures for shared setup (in conftest.py)
 - ✅ Use `@pytest.mark.asyncio` for async tests
 - ✅ Use `@pytest.mark.parametrize` for edge cases
@@ -2208,11 +2277,13 @@ websockets.connect(url, ssl=ssl_context)  # Proper way
 **Recommendation:** For production, use Gunicorn with uvicorn workers for multi-process execution.
 
 **Current (OK for home use):**
+
 ```bash
 uvicorn home_dashboard.main:app --host 0.0.0.0 --port 8000
 ```
 
 **Better (for production):**
+
 ```bash
 gunicorn home_dashboard.main:app \
   --worker-class uvicorn.workers.UvicornWorker \
@@ -2230,8 +2301,8 @@ All recommendations in this revised review are based on official documentation:
 
 1. **FastAPI 0.122.0 Release Notes:** github.com/fastapi/fastapi/releases/tag/0.122.0
 2. **Pydantic 2.12 Documentation:** docs.pydantic.dev/2.12/
-3. **httpx 0.27 Advanced Guide:** www.python-httpx.org/advanced/
-4. **uvicorn Deployment Guide:** www.uvicorn.org/deployment/
+3. **httpx 0.27 Advanced Guide:** <www.python-httpx.org/advanced/>
+4. **uvicorn Deployment Guide:** <www.uvicorn.org/deployment/>
 5. **websockets 12.0 Documentation:** websockets.readthedocs.io/
 6. **pytest 8.4 Documentation:** docs.pytest.org/en/8.4.x/
 7. **Docker Multi-Stage Builds:** docs.docker.com/build/building/multi-stage/

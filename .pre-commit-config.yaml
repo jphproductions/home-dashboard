@@ -7,7 +7,7 @@
 # - Limit bandit to source code directories
 
 # Global exclude patterns - skip these directories entirely
-exclude: '^(\.venv/|\.mypy_cache/|\.pytest_cache/|\.ruff_cache/|logs/|htmlcov/|dist/|build/|\.git/)'
+exclude: '^(\.venv/|\.mypy_cache/|\.ruff_cache/|logs/|dist/|build/|\.git/)'
 
 repos:
   # General file checks
@@ -34,7 +34,6 @@ repos:
       - id: ruff-format
 
   # Type checking with mypy (LIMITED TO SOURCE CODE ONLY)
-  # Note: Tests are type-checked separately during pytest runs
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.13.0
     hooks:

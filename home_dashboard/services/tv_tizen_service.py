@@ -3,8 +3,9 @@
 import asyncio
 import json
 import ssl
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from typing import TypeVar
 
 import websockets
 from websockets.exceptions import (
@@ -22,6 +23,71 @@ from home_dashboard.state_managers import TVStateManager
 logger = get_logger(__name__)
 
 # NOTE: Global state is deprecated - use TVStateManager via dependency injection
+
+# Retry configuration
+MAX_RETRIES = 3
+INITIAL_BACKOFF = 1.0  # seconds
+MAX_BACKOFF = 10.0  # seconds
+
+T = TypeVar("T")
+
+
+async def _retry_with_backoff(
+    operation: Callable[[], Awaitable[T]],
+    operation_name: str,
+    max_retries: int = MAX_RETRIES,
+    initial_backoff: float = INITIAL_BACKOFF,
+) -> T:
+    """Retry an async operation with exponential backoff.
+
+    Args:
+        operation: Async function to retry
+        operation_name: Name for logging
+        max_retries: Maximum number of retry attempts
+        initial_backoff: Initial backoff delay in seconds
+
+    Returns:
+        Result of operation
+
+    Raises:
+        Last exception if all retries exhausted
+    """
+    last_exception = None
+    backoff = initial_backoff
+
+    for attempt in range(max_retries + 1):
+        try:
+            result: T = await operation()
+            return result
+        except (TVConnectionException, OSError, TimeoutError) as e:
+            last_exception = e
+
+            if attempt < max_retries:
+                log_with_context(
+                    logger,
+                    "warning",
+                    f"{operation_name} failed, retrying",
+                    attempt=attempt + 1,
+                    max_retries=max_retries,
+                    backoff=backoff,
+                    error=str(e),
+                    event_type="tv_retry",
+                )
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, MAX_BACKOFF)  # Exponential backoff with cap
+            else:
+                log_with_context(
+                    logger,
+                    "error",
+                    f"{operation_name} failed after all retries",
+                    attempts=max_retries + 1,
+                    error=str(e),
+                    event_type="tv_retry_exhausted",
+                )
+
+    if last_exception:
+        raise last_exception
+    raise TVConnectionException(f"{operation_name} failed with no exception recorded")
 
 
 def _create_ssl_context() -> ssl.SSLContext:
@@ -160,7 +226,7 @@ async def wake(settings: Settings | None = None, tv_manager: TVStateManager | No
     """
     Send KEY_POWER to TV to wake it (toggle power).
 
-    Uses WebSocket to Tizen TV API with proper SSL handling.
+    Uses WebSocket to Tizen TV API with proper SSL handling and automatic retries.
 
     Args:
         settings: Settings instance (defaults to singleton)
@@ -170,12 +236,12 @@ async def wake(settings: Settings | None = None, tv_manager: TVStateManager | No
         Status message.
 
     Raises:
-        TVConnectionException: If connection fails.
+        TVConnectionException: If connection fails after all retries.
     """
     if settings is None:
         settings = get_settings()
 
-    try:
+    async def _send_wake_command() -> str:
         async with _connect_to_tv(settings) as websocket:
             # Send KEY_POWER
             key_command = {
@@ -188,10 +254,6 @@ async def wake(settings: Settings | None = None, tv_manager: TVStateManager | No
             }
             await websocket.send(json.dumps(key_command))
 
-            # Reset failure count on success
-            if tv_manager:
-                await tv_manager.reset_wake_failures()
-
             log_with_context(
                 logger,
                 "info",
@@ -201,6 +263,15 @@ async def wake(settings: Settings | None = None, tv_manager: TVStateManager | No
             )
             return "KEY_POWER sent to TV"
 
+    try:
+        result: str = await _retry_with_backoff(_send_wake_command, "TV wake command")
+
+        # Reset failure count on success
+        if tv_manager:
+            await tv_manager.reset_wake_failures()
+
+        return result
+
     except TVConnectionException as e:
         # Track failure
         if tv_manager:
@@ -208,7 +279,7 @@ async def wake(settings: Settings | None = None, tv_manager: TVStateManager | No
             log_with_context(
                 logger,
                 "warning",
-                "TV wake failed",
+                "TV wake failed after retries",
                 tv_ip=str(settings.tv_ip),
                 attempt=count,
                 error=e.message,
@@ -229,7 +300,7 @@ async def wake(settings: Settings | None = None, tv_manager: TVStateManager | No
             log_with_context(
                 logger,
                 "warning",
-                "TV wake failed",
+                "TV wake failed after retries",
                 tv_ip=str(settings.tv_ip),
                 error=e.message,
                 event_type="tv_wake_failure",

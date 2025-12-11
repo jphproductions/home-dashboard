@@ -4,21 +4,29 @@ from typing import Literal
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from home_dashboard.dependencies import get_http_client
+from home_dashboard.security import verify_api_key
 from home_dashboard.services import phone_ifttt_service
 from home_dashboard.views.template_renderer import TemplateRenderer
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
-@router.post("/ring")
+@router.post("/ring", dependencies=[Depends(verify_api_key)])
+@limiter.limit("5/minute")
 async def ring_phone(
     request: Request,
     client: httpx.AsyncClient = Depends(get_http_client),
     format: Literal["json", "html"] = Query(default="html", description="Response format"),
 ):
     """Trigger IFTTT webhook to ring phone.
+
+    **Protected endpoint**: Requires API key authentication.
+    **Rate limited**: 5 requests per minute per IP.
 
     Args:
         request: FastAPI request object
@@ -27,6 +35,10 @@ async def ring_phone(
 
     Returns:
         JSON with status or HTML tile fragment
+
+    Security:
+        - Requires Bearer token authentication
+        - Rate limited to prevent abuse
     """
     try:
         await phone_ifttt_service.ring_phone(client)
