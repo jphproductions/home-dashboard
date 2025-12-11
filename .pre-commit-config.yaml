@@ -1,0 +1,55 @@
+# Pre-commit hooks for home-dashboard project
+# See https://pre-commit.com for more information
+#
+# Performance optimizations:
+# - Exclude common non-source directories
+# - Limit mypy to main source code only (not tests)
+# - Limit bandit to source code directories
+
+# Global exclude patterns - skip these directories entirely
+exclude: '^(\.venv/|\.mypy_cache/|\.pytest_cache/|\.ruff_cache/|logs/|htmlcov/|dist/|build/|\.git/)'
+
+repos:
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  # Python code formatting with ruff (fast, no need to limit)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      # Run the linter
+      - id: ruff
+        args: [--fix]
+      # Run the formatter
+      - id: ruff-format
+
+  # Type checking with mypy (LIMITED TO SOURCE CODE ONLY)
+  # Note: Tests are type-checked separately during pytest runs
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        files: '^home_dashboard/'
+        additional_dependencies:
+          - types-requests
+          - pydantic
+        args: [--ignore-missing-imports, --no-error-summary]
+
+  # Security checks (LIMITED TO SOURCE CODE ONLY)
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.10
+    hooks:
+      - id: bandit
+        files: '^home_dashboard/'
+        args: [-c, pyproject.toml, -r]
+        additional_dependencies: ["bandit[toml]"]

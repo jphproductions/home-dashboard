@@ -1,8 +1,9 @@
 """Phone/IFTTT API routes with support for JSON and HTML responses."""
 
 from typing import Literal
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
+
 import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from home_dashboard.dependencies import get_http_client
 from home_dashboard.services import phone_ifttt_service

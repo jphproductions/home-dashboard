@@ -3,13 +3,14 @@
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+import httpx
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-import httpx
 
-from home_dashboard.services import spotify_service, weather_service
 from home_dashboard.config import Settings, get_settings
+from home_dashboard.services import spotify_service, weather_service
 
 if TYPE_CHECKING:
     from home_dashboard.state_managers import SpotifyAuthManager

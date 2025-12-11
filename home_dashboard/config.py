@@ -1,12 +1,14 @@
 import ipaddress
 import json
-import logging
 from functools import cached_property
-from pydantic import field_validator, Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from home_dashboard.logging_config import get_logger, log_with_context
+
+logger = get_logger(__name__)
 
 # Use parent directory (now that structure is flat)
 BASE_DIR = Path(__file__).resolve().parent.parent  # home-dashboard/
@@ -72,7 +74,13 @@ class Settings(BaseSettings):
         file_path = BASE_DIR / "playlists.json"
 
         if not file_path.exists():
-            logger.warning(f"playlists.json not found at {file_path}, returning empty list")
+            log_with_context(
+                logger,
+                "warning",
+                "playlists.json not found, returning empty list",
+                file_path=str(file_path),
+                event_type="config_playlists_missing",
+            )
             return []
 
         try:
@@ -85,7 +93,14 @@ class Settings(BaseSettings):
 
             return data
         except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON in playlists.json: {e}")
+            log_with_context(
+                logger,
+                "error",
+                "Invalid JSON in playlists.json",
+                file_path=str(file_path),
+                error=str(e),
+                event_type="config_playlists_invalid",
+            )
             raise ValueError(f"playlists.json contains invalid JSON: {e}") from e
 
     @field_validator("api_host", mode="after")
@@ -126,7 +141,13 @@ class Settings(BaseSettings):
 
         # Warn if using wrong port (8501 is old Streamlit port)
         if ":8501" in v:
-            logger.warning("spotify_redirect_uri uses port 8501 (Streamlit). Should be 8000 for FastAPI.")
+            log_with_context(
+                logger,
+                "warning",
+                "spotify_redirect_uri uses port 8501 (Streamlit), should be 8000 for FastAPI",
+                redirect_uri=v,
+                event_type="config_spotify_port_mismatch",
+            )
 
         return v
 
@@ -152,7 +173,7 @@ def get_settings() -> Settings:
     """
     global _settings_instance
     if _settings_instance is None:
-        _settings_instance = Settings()  # type: ignore[call-arg]
+        _settings_instance = Settings()
     return _settings_instance
 
 

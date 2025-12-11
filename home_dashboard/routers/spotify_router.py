@@ -1,20 +1,24 @@
 """Spotify API routes with support for JSON and HTML responses."""
 
 import asyncio
-import httpx
 import secrets
 from typing import Literal
 from urllib.parse import urlencode
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
-from fastapi.responses import RedirectResponse, HTMLResponse
 
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+from home_dashboard.config import Settings, get_settings
 from home_dashboard.dependencies import get_http_client, get_spotify_auth_manager, get_tv_state_manager
 from home_dashboard.services import spotify_service
-from home_dashboard.config import Settings, get_settings
-from home_dashboard.views.template_renderer import TemplateRenderer
 from home_dashboard.state_managers import SpotifyAuthManager, TVStateManager
+from home_dashboard.views.template_renderer import TemplateRenderer
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 # Store state for OAuth flow (in production, use Redis or database)
 _oauth_states = {}
@@ -30,6 +34,7 @@ SPOTIFY_SCOPES = [
 
 
 @router.get("/status")
+@limiter.limit("60/minute")
 async def get_spotify_status(
     request: Request,
     client: httpx.AsyncClient = Depends(get_http_client),
@@ -59,6 +64,7 @@ async def get_spotify_status(
 
 
 @router.post("/play")
+@limiter.limit("30/minute")
 async def play(
     request: Request,
     client: httpx.AsyncClient = Depends(get_http_client),

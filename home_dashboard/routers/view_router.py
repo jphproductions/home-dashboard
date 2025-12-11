@@ -1,12 +1,12 @@
 """Page/view routes for serving HTML pages and tile fragments."""
 
-from fastapi import APIRouter, Request, Depends
-from fastapi.responses import HTMLResponse
 import httpx
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import HTMLResponse
 
 from home_dashboard.dependencies import get_http_client, get_spotify_auth_manager
-from home_dashboard.views.template_renderer import TemplateRenderer
 from home_dashboard.state_managers import SpotifyAuthManager
+from home_dashboard.views.template_renderer import TemplateRenderer
 
 router = APIRouter()
 

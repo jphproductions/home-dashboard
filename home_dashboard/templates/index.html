@@ -2,10 +2,10 @@
 
 {% block content %}
 <!-- Weather Tile -->
-<div id="weather-tile" 
+<div id="weather-tile"
      class="weather-area"
-     hx-get="/tiles/weather" 
-     hx-trigger="load, every 600s" 
+     hx-get="/tiles/weather"
+     hx-trigger="load, every 600s"
      hx-swap="outerHTML">
     <div class="tile">
         <h2>Loading Weather...</h2>
@@ -13,10 +13,10 @@
 </div>
 
 <!-- Spotify Tile -->
-<div id="spotify-tile" 
+<div id="spotify-tile"
      class="spotify-area"
-     hx-get="/tiles/spotify" 
-     hx-trigger="load, every 10s" 
+     hx-get="/tiles/spotify"
+     hx-trigger="load, every 10s"
      hx-swap="outerHTML">
     <div class="tile">
         <h2>Loading Spotify...</h2>
@@ -24,10 +24,10 @@
 </div>
 
 <!-- Phone Tile -->
-<div id="phone-tile" 
+<div id="phone-tile"
      class="phone-area"
-     hx-get="/tiles/phone" 
-     hx-trigger="load" 
+     hx-get="/tiles/phone"
+     hx-trigger="load"
      hx-swap="outerHTML">
     <div class="tile">
         <h2>Loading Phone...</h2>
@@ -35,10 +35,10 @@
 </div>
 
 <!-- Quick Actions Tile -->
-<div id="quick-actions-tile" 
+<div id="quick-actions-tile"
      class="actions-area"
-     hx-get="/tiles/quick-actions" 
-     hx-trigger="load" 
+     hx-get="/tiles/quick-actions"
+     hx-trigger="load"
      hx-swap="outerHTML">
     <div class="tile">
         <h2>Loading Quick Actions...</h2>
@@ -46,10 +46,10 @@
 </div>
 
 <!-- Status Bar -->
-<div id="status-tile" 
+<div id="status-tile"
      class="status-area"
-     hx-get="/tiles/status" 
-     hx-trigger="load, every 30s" 
+     hx-get="/tiles/status"
+     hx-trigger="load, every 30s"
      hx-swap="outerHTML">
 </div>
 {% endblock %}

@@ -1,12 +1,12 @@
 """IFTTT webhook service for phone notifications."""
 
 import httpx
-from typing import Optional
+
 from home_dashboard.config import Settings, get_settings
-from home_dashboard.exceptions import PhoneException, IFTTTException
+from home_dashboard.exceptions import IFTTTException, PhoneException
 
 
-async def ring_phone(client: httpx.AsyncClient, message: Optional[str] = None, settings: Settings | None = None) -> str:
+async def ring_phone(client: httpx.AsyncClient, message: str | None = None, settings: Settings | None = None) -> str:
     """
     Trigger IFTTT webhook to ring Jamie's phone.
 

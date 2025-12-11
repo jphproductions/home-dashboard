@@ -1,14 +1,14 @@
 # SENIOR DEVELOPER CODE REVIEW: HOME DASHBOARD PROJECT
 
-**Reviewed by:** Senior Development Team  
-**Date:** December 9, 2025  
-**Revised:** December 9, 2025 (with official documentation)  
-**Status:** 🔴 CRITICAL REFACTORING REQUIRED  
+**Reviewed by:** Senior Development Team
+**Date:** December 9, 2025
+**Revised:** December 9, 2025 (with official documentation)
+**Status:** 🔴 CRITICAL REFACTORING REQUIRED
 **Overall Grade:** D-
 
 **Documentation Sources:**
 - FastAPI 0.122.0 official docs
-- Pydantic 2.12.5 official docs  
+- Pydantic 2.12.5 official docs
 - httpx 0.27.2 official docs
 - uvicorn 0.32.1 official docs
 - pytest 8.4.2 official docs
@@ -24,7 +24,7 @@ This project is a mess of contradictions, poor architectural decisions, half-imp
 
 **⚠️ CRITICAL VERSION ALERT:** You're using FastAPI 0.122.1, which introduced **BREAKING CHANGES** in dependency injection with `yield` (version 0.122.0). Your current exception handling in dependencies will cause memory leaks!
 
-**The Good News:** The project has a clear purpose and some decent bones.  
+**The Good News:** The project has a clear purpose and some decent bones.
 **The Bad News:** Almost everything else violates official best practices for your installed versions.
 
 ---
@@ -130,13 +130,13 @@ from typing import Any
 
 class Settings(BaseSettings):
     """Application settings with validation.
-    
+
     Using Pydantic v2 API:
     - model_config with ConfigDict instead of class Config
     - field_validator decorator instead of @validator
     - cached_property for expensive computations
     """
-    
+
     # ✅ Pydantic v2: Use model_config with SettingsConfigDict
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -145,39 +145,39 @@ class Settings(BaseSettings):
         extra="ignore",
         validate_default=True,  # Validate defaults too
     )
-    
+
     # API settings
     api_host: str = "0.0.0.0"
     api_port: int = Field(ge=1, le=65535, default=8000)
-    
+
     # TV settings - use IPvAnyAddress for validation
     tv_ip: IPvAnyAddress
     tv_spotify_device_id: str = Field(min_length=1)
-    
+
     # Weather settings
     weather_api_key: str = Field(min_length=1)
     weather_location: str = Field(min_length=1)
     weather_latitude: float = Field(ge=-90, le=90)
     weather_longitude: float = Field(ge=-180, le=180)
-    
+
     # Spotify settings
     spotify_client_id: str = Field(min_length=1)
     spotify_client_secret: str = Field(min_length=1)
     spotify_redirect_uri: str = Field(pattern=r"^https?://.*")
     spotify_refresh_token: str = ""
-    
+
     # IFTTT settings
     ifttt_webhook_key: str = Field(min_length=1)
     ifttt_event_name: str = Field(min_length=1)
-    
+
     # Playlists file location
     playlists_file: Path = Field(default=Path("playlists.json"))
-    
+
     # ✅ Pydantic v2: Use cached_property for expensive operations
     @cached_property
     def spotify_favorite_playlists(self) -> list[dict]:
         """Cached playlist loading - reads file ONCE.
-        
+
         Per Pydantic docs: Use @cached_property for computed fields
         that are expensive to calculate and won't change.
         """
@@ -187,7 +187,7 @@ class Settings(BaseSettings):
             return json.loads(self.playlists_file.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             return []
-    
+
     # ✅ Pydantic v2: Use @field_validator (replaces @validator)
     @field_validator("spotify_redirect_uri", mode="after")
     @classmethod
@@ -199,7 +199,7 @@ class Settings(BaseSettings):
                 f"Got: {v}"
             )
         return v
-    
+
     @field_validator("weather_latitude", "weather_longitude", mode="before")
     @classmethod
     def coerce_coordinates(cls, v: Any, info) -> float:
@@ -213,7 +213,7 @@ class Settings(BaseSettings):
 # ✅ Dependency injection pattern (FastAPI best practice)
 def get_settings() -> Settings:
     """Settings dependency - can be overridden for testing.
-    
+
     Per FastAPI docs: Use dependency functions for better testability.
     """
     return Settings()
@@ -247,7 +247,7 @@ async def lifespan(app: FastAPI):
         event_hooks={"request": [log_request], "response": [log_response]},
     )
     app.state.http_client = client
-    
+
     try:
         yield
     except Exception as e:  # ⚠️ THIS IS BROKEN IN 0.122.0+
@@ -278,7 +278,7 @@ from fastapi import FastAPI
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Lifespan context with proper FastAPI 0.122.0+ exception handling.
-    
+
     Per FastAPI 0.122.0 breaking changes: Dependencies with yield MUST
     re-raise exceptions after yield to avoid memory leaks.
     """
@@ -301,7 +301,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         },
     )
     app.state.http_client = client
-    
+
     try:
         logger.info("Starting up: HTTP client pool initialized")
         yield
@@ -366,7 +366,7 @@ from fastapi.testclient import TestClient
 def test_lifespan_exception_propagation():
     """Verify FastAPI 0.122.0+ exception handling."""
     from home_dashboard.main import app
-    
+
     with pytest.raises(Exception):
         with TestClient(app):
             # Simulate error during lifespan
@@ -414,9 +414,9 @@ async def lifespan(app: FastAPI):
     # Initialize state
     app.state.spotify_auth = SpotifyAuthManager()
     app.state.tv_state = TVStateManager()
-    
+
     yield
-    
+
     # Cleanup
     await app.state.spotify_auth.close()
 
@@ -433,13 +433,13 @@ from redis.asyncio import Redis
 class SpotifyAuthManager:
     def __init__(self, redis: Redis):
         self.redis = redis
-        
+
     async def get_access_token(self) -> str:
         # Check cache
         token = await self.redis.get("spotify:access_token")
         if token:
             return token.decode()
-        
+
         # Refresh token
         new_token = await self._refresh_token()
         await self.redis.setex(
@@ -459,7 +459,7 @@ Base = declarative_base()
 
 class AuthToken(Base):
     __tablename__ = "auth_tokens"
-    
+
     service = Column(String, primary_key=True)
     access_token = Column(String)
     refresh_token = Column(String)
@@ -501,11 +501,11 @@ from cryptography.fernet import Fernet
 
 class TokenStore:
     """Secure token storage with encryption."""
-    
+
     def __init__(self, storage_dir: Path | None = None):
         self.storage_dir = storage_dir or Path(os.getenv("TOKEN_STORE_DIR", "."))
         self.token_file = self.storage_dir / ".tokens.enc"
-        
+
         # Use encryption key from environment
         key = os.getenv("TOKEN_ENCRYPTION_KEY")
         if not key:
@@ -516,28 +516,28 @@ class TokenStore:
                 "Add this to your .env file: TOKEN_ENCRYPTION_KEY={key}"
             )
         self.cipher = Fernet(key.encode())
-    
+
     def save_token(self, service: str, token: str) -> None:
         """Save encrypted token."""
         # Read existing tokens
         tokens = self._load_tokens()
         tokens[service] = token
-        
+
         # Encrypt and save atomically
         encrypted = self.cipher.encrypt(json.dumps(tokens).encode())
         temp_file = self.token_file.with_suffix(".tmp")
         temp_file.write_bytes(encrypted)
         temp_file.replace(self.token_file)  # Atomic rename
-        
+
         # Set permissions (Unix only)
         if hasattr(os, "chmod"):
             self.token_file.chmod(0o600)
-    
+
     def load_token(self, service: str) -> str | None:
         """Load decrypted token."""
         tokens = self._load_tokens()
         return tokens.get(service)
-    
+
     def _load_tokens(self) -> dict:
         """Load and decrypt tokens."""
         if not self.token_file.exists():
@@ -781,7 +781,7 @@ class ErrorCode(str, Enum):
 
 class DashboardException(Exception):
     """Base exception with error code and details."""
-    
+
     def __init__(
         self,
         message: str,
@@ -797,7 +797,7 @@ class DashboardException(Exception):
 
 class SpotifyAuthError(DashboardException):
     """Spotify authentication failed."""
-    
+
     def __init__(self, message: str = "Spotify authentication failed"):
         super().__init__(
             message=message,
@@ -897,7 +897,7 @@ def mock_settings():
 
 class TestSpotifyService:
     """Test suite for Spotify service."""
-    
+
     @pytest.mark.asyncio
     async def test_get_current_track_success(
         self,
@@ -920,10 +920,10 @@ class TestSpotifyService:
             "device": {"name": "Test Device"},
             "progress_ms": 60000,
         }
-        
+
         # Act
         result = await spotify_service.get_current_track(mock_http_client)
-        
+
         # Assert
         assert isinstance(result, SpotifyStatus)
         assert result.is_playing is True
@@ -932,7 +932,7 @@ class TestSpotifyService:
         assert result.device_name == "Test Device"
         assert result.progress_ms == 60000
         assert result.duration_ms == 180000
-    
+
     @pytest.mark.asyncio
     async def test_get_current_track_not_playing(
         self,
@@ -947,15 +947,15 @@ class TestSpotifyService:
         }
         mock_http_client.get.return_value.status_code = 204
         mock_http_client.get.return_value.json.return_value = {}
-        
+
         # Act
         result = await spotify_service.get_current_track(mock_http_client)
-        
+
         # Assert
         assert result.is_playing is False
         assert result.track_name is None
         assert result.artist_name is None
-    
+
     @pytest.mark.asyncio
     async def test_get_current_track_auth_failure(
         self,
@@ -965,13 +965,13 @@ class TestSpotifyService:
         """Test auth failure handling."""
         # Arrange
         from httpx import HTTPStatusError, Response, Request
-        
+
         mock_http_client.post.side_effect = HTTPStatusError(
             "Auth failed",
             request=Request("POST", "https://api.spotify.com"),
             response=Response(401),
         )
-        
+
         # Act & Assert
         with pytest.raises(SpotifyAuthError):
             await spotify_service.get_current_track(mock_http_client)
@@ -992,7 +992,7 @@ from home_dashboard.config import Settings
 @pytest.fixture
 def mock_settings() -> Settings:
     """Mock settings fixture - reusable across all tests.
-    
+
     Per pytest best practices: Use fixtures to avoid code duplication.
     """
     return Settings(
@@ -1015,7 +1015,7 @@ def mock_settings() -> Settings:
 @pytest.fixture
 async def async_http_client() -> AsyncMock:
     """Mock async HTTP client.
-    
+
     Per pytest-asyncio: Use async fixtures for async code.
     """
     client = AsyncMock(spec=httpx.AsyncClient)
@@ -1169,7 +1169,7 @@ from typing import AsyncGenerator
 from websockets.asyncio.client import connect  # ✅ Use asyncio client from websockets 12.0
 from websockets.exceptions import (
     ConnectionClosed,
-    ConnectionClosedOK, 
+    ConnectionClosedOK,
     ConnectionClosedError,
     InvalidHandshake,
     InvalidURI,
@@ -1182,28 +1182,28 @@ logger = logging.getLogger(__name__)
 
 class TizenTVClient:
     """Samsung Tizen TV WebSocket client with proper connection management.
-    
+
     Per websockets 12.0 best practices:
     - Use async context managers for automatic cleanup
     - Handle all connection exception types explicitly
     - Configure timeouts to prevent hanging
     - Use proper SSL context for self-signed certs
     """
-    
+
     def __init__(self):
         self.settings = get_settings()
         self._lock = asyncio.Lock()  # Prevent concurrent connection attempts
-        
+
         # ✅ Per websockets best practices: Use ssl_context, not ssl=False
         # Per Python SSL docs: Create context for self-signed certs
         self.ssl_context = ssl.create_default_context()
         self.ssl_context.check_hostname = False
         self.ssl_context.verify_mode = ssl.CERT_NONE
-    
+
     @asynccontextmanager
     async def connect(self) -> AsyncGenerator:
         """Connect to TV with proper error handling per websockets 12.0 docs.
-        
+
         Per websockets best practices:
         - Use async context manager to ensure connection cleanup
         - Configure ping/pong for keepalive
@@ -1215,7 +1215,7 @@ class TizenTVClient:
             f"/api/v2/channels/samsung.remote.control"
             f"?name=PythonDashboard"
         )
-        
+
         async with self._lock:  # Prevent race conditions
             try:
                 # ✅ Per websockets 12.0: Use connect() as async context manager
@@ -1233,16 +1233,16 @@ class TizenTVClient:
                             message=f"TV connection not open: {websocket.protocol.state.name}",
                             code=ErrorCode.TV_UNREACHABLE,
                         )
-                    
+
                     # Send handshake
                     await self._handshake(websocket)
                     yield websocket
-                    
+
             # ✅ Per websockets docs: Handle specific exception types
             except ConnectionClosedOK:
                 logger.info("TV connection closed normally")
                 # This is fine, connection closed gracefully
-                
+
             except ConnectionClosedError as e:
                 logger.error(f"TV connection closed with error: {e.code} - {e.reason}")
                 raise TVException(
@@ -1250,7 +1250,7 @@ class TizenTVClient:
                     code=ErrorCode.TV_UNREACHABLE,
                     details={"close_code": e.code, "reason": e.reason},
                 )
-                
+
             except InvalidURI as e:
                 logger.error(f"Invalid TV WebSocket URI: {ws_url}")
                 raise TVException(
@@ -1258,7 +1258,7 @@ class TizenTVClient:
                     code=ErrorCode.CONFIGURATION_ERROR,
                     details={"uri": ws_url},
                 )
-                
+
             except InvalidHandshake as e:
                 logger.error(f"TV WebSocket handshake failed: {e}")
                 raise TVException(
@@ -1266,7 +1266,7 @@ class TizenTVClient:
                     code=ErrorCode.TV_UNREACHABLE,
                     details={"error": str(e)},
                 )
-                
+
             except OSError as e:
                 # Network errors (connection refused, no route to host, etc.)
                 logger.error(f"TV network error: {e}")
@@ -1275,7 +1275,7 @@ class TizenTVClient:
                     code=ErrorCode.TV_UNREACHABLE,
                     details={"ip": str(self.settings.tv_ip), "error": str(e)},
                 )
-                
+
             except asyncio.TimeoutError:
                 logger.error("TV connection timeout")
                 raise TVException(
@@ -1283,10 +1283,10 @@ class TizenTVClient:
                     code=ErrorCode.TV_UNREACHABLE,
                     details={"timeout": "10s"},
                 )
-    
+
     async def _handshake(self, websocket) -> None:
         """Perform handshake with TV using timeout.
-        
+
         Per websockets best practices: Use asyncio.wait_for for receive timeout.
         """
         handshake = {
@@ -1297,17 +1297,17 @@ class TizenTVClient:
                 "deviceName": "PythonDashboard",
             },
         }
-        
+
         try:
             await websocket.send(json.dumps(handshake))
-            
+
             # ✅ Per websockets docs: Use wait_for for receive timeout
             response = await asyncio.wait_for(
                 websocket.recv(),
                 timeout=5.0
             )
             logger.debug(f"TV handshake response: {response}")
-            
+
         except asyncio.TimeoutError:
             raise TVException(
                 message="TV handshake timeout",
@@ -1318,15 +1318,15 @@ class TizenTVClient:
                 message=f"TV closed connection during handshake: {e.reason}",
                 code=ErrorCode.TV_UNREACHABLE,
             )
-    
+
     async def send_key(self, key_code: str) -> None:
         """Send remote key to TV with retry logic.
-        
+
         Per websockets best practices: Handle transient failures with retry.
         """
         max_retries = 3
         retry_delay = 1.0
-        
+
         for attempt in range(max_retries):
             try:
                 # ✅ Context manager ensures connection cleanup even on exception
@@ -1352,15 +1352,15 @@ class TizenTVClient:
                     retry_delay *= 2  # Exponential backoff
                 else:
                     raise
-    
+
     async def wake(self) -> None:
         """Wake TV (toggle power)."""
         await self.send_key("KEY_POWER")
-    
+
     async def power_off(self) -> None:
         """Power off TV."""
         await self.send_key("KEY_POWEROFF")
-    
+
     async def is_reachable(self) -> bool:
         """Check if TV is reachable."""
         try:
@@ -1433,7 +1433,7 @@ async def verify_api_key(request: Request):
     """Verify API key from header."""
     if not API_KEY:
         return  # No auth configured
-    
+
     api_key = request.headers.get("X-API-Key")
     if api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key")
@@ -1609,28 +1609,28 @@ from fastapi.openapi.utils import get_openapi
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
-    
+
     openapi_schema = get_openapi(
         title="Home Dashboard API",
         version="0.2.0",
         description="""
         # Home Dashboard API
-        
+
         Control your home devices from a unified dashboard.
-        
+
         ## Features
         - **Spotify**: Control playback, switch playlists
         - **Weather**: Get current weather and recommendations
         - **TV**: Control Samsung Tizen TV via WebSocket
         - **Phone**: Trigger IFTTT webhooks
-        
+
         ## Authentication
         Most endpoints require no authentication for home network use.
         For external access, use X-API-Key header.
         """,
         routes=app.routes,
     )
-    
+
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
@@ -1646,9 +1646,9 @@ Also, add proper docstrings to ALL endpoints:
     summary="Get Spotify playback status",
     description="""
     Retrieves the current playback status from Spotify.
-    
+
     Returns track information, playback state, and device name.
-    
+
     **Note:** Requires Spotify authentication. Visit `/api/spotify/auth/login` first.
     """,
     responses={
@@ -1832,7 +1832,7 @@ async def readiness(client: httpx.AsyncClient = Depends(get_http_client)):
     checks = {
         "http_client": client is not None,
     }
-    
+
     # Check external services
     try:
         # Quick check to Spotify
@@ -1840,10 +1840,10 @@ async def readiness(client: httpx.AsyncClient = Depends(get_http_client)):
         checks["spotify_reachable"] = True
     except:
         checks["spotify_reachable"] = False
-    
+
     all_healthy = all(checks.values())
     status_code = 200 if all_healthy else 503
-    
+
     return JSONResponse(
         status_code=status_code,
         content={"status": "ready" if all_healthy else "not_ready", "checks": checks},
@@ -1871,46 +1871,46 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      
+
       - name: Install Poetry
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
           echo "$HOME/.local/bin" >> $GITHUB_PATH
-      
+
       - name: Install dependencies
         run: poetry install
-      
+
       - name: Run linting
         run: |
           poetry run ruff check home_dashboard
           poetry run mypy home_dashboard
-      
+
       - name: Run tests
         run: poetry run pytest --cov=home_dashboard --cov-report=xml
-      
+
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         with:
           file: ./coverage.xml
-  
+
   build:
     runs-on: ubuntu-latest
     needs: test
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Build Docker image
         run: docker build -t home-dashboard:${{ github.sha }} -f docker/Dockerfile .
-      
+
       - name: Test Docker image
         run: |
           docker run -d -p 8000:8000 --name test-container \
@@ -1938,31 +1938,31 @@ from datetime import datetime, timedelta
 
 class CachedWeatherService:
     """Weather service with caching."""
-    
+
     def __init__(self):
         self._cache: dict[str, tuple[WeatherResponse, datetime]] = {}
         self._cache_ttl = timedelta(minutes=10)
-    
+
     async def get_current_weather(
         self,
         client: httpx.AsyncClient,
     ) -> WeatherResponse:
         """Get weather with caching."""
         cache_key = f"{settings.weather_latitude}:{settings.weather_longitude}"
-        
+
         # Check cache
         if cache_key in self._cache:
             data, cached_at = self._cache[cache_key]
             if datetime.now() - cached_at < self._cache_ttl:
                 logger.debug("Weather cache hit")
                 return data
-        
+
         # Fetch fresh data
         logger.debug("Weather cache miss, fetching")
         weather = await self._fetch_weather(client)
         self._cache[cache_key] = (weather, datetime.now())
         return weather
-    
+
     async def _fetch_weather(self, client: httpx.AsyncClient) -> WeatherResponse:
         """Fetch weather from API."""
         # Original implementation
@@ -1976,11 +1976,11 @@ import redis.asyncio as redis
 class RedisCache:
     def __init__(self, redis_url: str = "redis://localhost"):
         self.redis = redis.from_url(redis_url)
-    
+
     async def get(self, key: str) -> str | None:
         value = await self.redis.get(key)
         return value.decode() if value else None
-    
+
     async def set(self, key: str, value: str, ttl: int = 600):
         await self.redis.setex(key, ttl, value)
 ```
@@ -2012,7 +2012,7 @@ async def stream_spotify_status(
             except Exception as e:
                 yield f"data: {{'error': '{str(e)}'}}\n\n"
             await asyncio.sleep(5)  # Update every 5 seconds
-    
+
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",

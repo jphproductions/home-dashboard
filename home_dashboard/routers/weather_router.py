@@ -1,19 +1,22 @@
 """Weather API routes with support for JSON and HTML responses."""
 
 from typing import Literal
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
-from fastapi.responses import HTMLResponse
+
 import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from home_dashboard.dependencies import get_http_client
 from home_dashboard.services import weather_service
-from home_dashboard.models.weather import WeatherResponse
 from home_dashboard.views.template_renderer import TemplateRenderer
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.get("/current")
+@limiter.limit("60/minute")
 async def get_current_weather(
     request: Request,
     client: httpx.AsyncClient = Depends(get_http_client),

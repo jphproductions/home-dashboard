@@ -1,19 +1,19 @@
 <div id="phone-tile" class="tile phone-area">
     <h2>📱 Phone</h2>
-    
+
     {% if success %}
     <div class="message success">
         Ring request sent! 📱
     </div>
     {% endif %}
-    
+
     {% if error %}
     <div class="message error">
         Failed to ring phone: {{ error }}
     </div>
     {% endif %}
-    
-    <button 
+
+    <button
         class="button button-primary"
         hx-post="/api/phone/ring-and-refresh"
         hx-target="#phone-tile"

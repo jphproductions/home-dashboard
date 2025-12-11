@@ -18,4 +18,3 @@ EnvironmentFile=-/home/pi/home-dashboard/.env
 
 [Install]
 WantedBy=multi-user.target
-

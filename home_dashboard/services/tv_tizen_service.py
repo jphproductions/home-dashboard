@@ -2,25 +2,24 @@
 
 import asyncio
 import json
-import logging
 import ssl
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 import websockets
 from websockets.exceptions import (
-    ConnectionClosed,
-    ConnectionClosedOK,
     ConnectionClosedError,
+    ConnectionClosedOK,
     InvalidHandshake,
     InvalidURI,
 )
 
 from home_dashboard.config import Settings, get_settings
+from home_dashboard.exceptions import TVConnectionException
+from home_dashboard.logging_config import get_logger, log_with_context
 from home_dashboard.state_managers import TVStateManager
-from home_dashboard.exceptions import TVException, TVConnectionException
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # NOTE: Global state is deprecated - use TVStateManager via dependency injection
 
@@ -83,17 +82,30 @@ async def _connect_to_tv(settings: Settings) -> AsyncGenerator:
             # Wait for handshake response with timeout
             try:
                 response = await asyncio.wait_for(websocket.recv(), timeout=5.0)
-                logger.debug(f"TV handshake response: {response!r}")
-            except asyncio.TimeoutError:
+                log_with_context(
+                    logger,
+                    "debug",
+                    "TV handshake response received",
+                    tv_ip=str(settings.tv_ip),
+                    response=str(response),
+                    event_type="tv_handshake",
+                )
+            except TimeoutError:
                 raise TVConnectionException(
                     "TV handshake timeout",
                     details={"tv_ip": str(settings.tv_ip), "error_type": "handshake_timeout"},
-                )
+                ) from None
 
             yield websocket
 
     except ConnectionClosedOK:
-        logger.info("TV connection closed normally")
+        log_with_context(
+            logger,
+            "info",
+            "TV connection closed normally",
+            tv_ip=str(settings.tv_ip),
+            event_type="tv_connection_closed",
+        )
 
     except ConnectionClosedError as e:
         raise TVConnectionException(
@@ -133,8 +145,7 @@ async def _connect_to_tv(settings: Settings) -> AsyncGenerator:
                 "error_type": "network_error",
             },
         ) from e
-
-    except asyncio.TimeoutError:
+    except TimeoutError:
         raise TVConnectionException(
             "TV connection timeout",
             details={
@@ -142,7 +153,7 @@ async def _connect_to_tv(settings: Settings) -> AsyncGenerator:
                 "error_type": "connection_timeout",
                 "timeout": "10s",
             },
-        )
+        ) from None
 
 
 async def wake(settings: Settings | None = None, tv_manager: TVStateManager | None = None) -> str:
@@ -181,20 +192,48 @@ async def wake(settings: Settings | None = None, tv_manager: TVStateManager | No
             if tv_manager:
                 await tv_manager.reset_wake_failures()
 
-            logger.info(f"Successfully sent KEY_POWER to TV at {settings.tv_ip}")
+            log_with_context(
+                logger,
+                "info",
+                "Successfully sent KEY_POWER to TV",
+                tv_ip=str(settings.tv_ip),
+                event_type="tv_wake_success",
+            )
             return "KEY_POWER sent to TV"
 
     except TVConnectionException as e:
         # Track failure
         if tv_manager:
             count = await tv_manager.increment_wake_failure()
-            logger.warning(f"TV wake failed (attempt {count}): {e.message}")
+            log_with_context(
+                logger,
+                "warning",
+                "TV wake failed",
+                tv_ip=str(settings.tv_ip),
+                attempt=count,
+                error=e.message,
+                event_type="tv_wake_failure",
+            )
 
             # Optional: escalate to phone notification after N failures
             if count >= 5:
-                logger.error("TV wake failed 5+ times, consider escalating")
+                log_with_context(
+                    logger,
+                    "error",
+                    "TV wake failed multiple times, consider escalating",
+                    tv_ip=str(settings.tv_ip),
+                    failure_count=count,
+                    event_type="tv_wake_critical",
+                )
         else:
-            logger.warning(f"TV wake failed: {e.message}")
+            log_with_context(
+                logger,
+                "warning",
+                "TV wake failed",
+                tv_ip=str(settings.tv_ip),
+                error=e.message,
+                event_type="tv_wake_failure",
+            )
 
         raise
 
@@ -215,14 +254,29 @@ async def get_status(settings: Settings | None = None) -> bool:
     try:
         # Try to connect as a simple reachability test
         # Note: actual power state detection via Tizen is unreliable
-        async with _connect_to_tv(settings) as websocket:
+        async with _connect_to_tv(settings) as _:
             # If we successfully connected and got handshake response,
             # assume TV is reachable (on or standby)
             return True
 
     except TVConnectionException as e:
-        logger.debug(f"TV status check failed: {e.message}")
+        log_with_context(
+            logger,
+            "debug",
+            "TV status check failed",
+            tv_ip=str(settings.tv_ip),
+            error=e.message,
+            event_type="tv_status_check_failed",
+        )
         return False
     except Exception as e:
-        logger.warning(f"Unexpected error during TV status check: {e}")
+        log_with_context(
+            logger,
+            "warning",
+            "Unexpected error during TV status check",
+            tv_ip=str(settings.tv_ip),
+            error=str(e),
+            error_type=type(e).__name__,
+            event_type="tv_status_unexpected_error",
+        )
         return False

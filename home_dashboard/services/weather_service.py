@@ -1,10 +1,10 @@
 """Weather service for OpenWeatherMap API integration."""
 
 import httpx
-from home_dashboard.config import Settings, get_settings
-from home_dashboard.models.weather import CurrentWeather, WeatherResponse
-from home_dashboard.exceptions import WeatherException, WeatherAPIException
 
+from home_dashboard.config import Settings, get_settings
+from home_dashboard.exceptions import WeatherAPIException, WeatherException
+from home_dashboard.models.weather import CurrentWeather, WeatherResponse
 
 OPENWEATHER_URL = "https://api.openweathermap.org/data/2.5/weather"
 

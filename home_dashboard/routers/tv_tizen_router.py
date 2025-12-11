@@ -1,8 +1,9 @@
 """TV (Tizen) API routes with support for JSON and HTML responses."""
 
 from typing import Literal
-from fastapi import APIRouter, Depends, HTTPException, Query
+
 import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from home_dashboard.dependencies import get_http_client, get_tv_state_manager
 from home_dashboard.services import tv_tizen_service

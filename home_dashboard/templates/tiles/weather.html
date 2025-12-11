@@ -1,12 +1,12 @@
 <div id="weather-tile" class="tile weather-area">
     <h2>🌤️ Weather</h2>
-    
+
     {% if error %}
     <div class="message error">
         Failed to load weather: {{ error }}
     </div>
     {% else %}
-    
+
     <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem;">
         <!-- Left column: Temperature & Wind -->
         <div>
@@ -17,7 +17,7 @@
             <div style="color: var(--text-secondary); margin-bottom: 1.5rem;">
                 Feels like {{ "%.1f"|format(feels_like) }}°C
             </div>
-            
+
             <strong>Wind</strong>
             <div style="font-size: 2.5rem; font-weight: bold; line-height: 1; margin: 0.5rem 0;">
                 {{ beaufort }} <span style="font-size: 2.5rem;">{{ wind_direction }}</span>
@@ -26,7 +26,7 @@
                 {{ beaufort_description }}
             </div>
         </div>
-        
+
         <!-- Right column: Condition & Recommendation -->
         <div>
             <div style="margin-bottom: 1rem;">
@@ -40,6 +40,6 @@
             </div>
         </div>
     </div>
-    
+
     {% endif %}
 </div>

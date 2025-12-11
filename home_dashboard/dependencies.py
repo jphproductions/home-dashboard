@@ -2,6 +2,7 @@
 
 import httpx
 from fastapi import Request
+
 from home_dashboard.state_managers import SpotifyAuthManager, TVStateManager
 
 
@@ -21,7 +22,7 @@ async def get_http_client(request: Request) -> httpx.AsyncClient:
     Raises:
         RuntimeError: If HTTP client is not initialized.
     """
-    client = request.app.state.http_client
+    client: httpx.AsyncClient = request.app.state.http_client
 
     if client is None:
         raise RuntimeError("HTTP client not initialized. This should never happen.")
@@ -45,7 +46,7 @@ async def get_spotify_auth_manager(request: Request) -> SpotifyAuthManager:
     Raises:
         RuntimeError: If Spotify auth manager is not initialized.
     """
-    manager = request.app.state.spotify_auth_manager
+    manager: SpotifyAuthManager = request.app.state.spotify_auth_manager
 
     if manager is None:
         raise RuntimeError("Spotify auth manager not initialized.")
@@ -69,7 +70,7 @@ async def get_tv_state_manager(request: Request) -> TVStateManager:
     Raises:
         RuntimeError: If TV state manager is not initialized.
     """
-    manager = request.app.state.tv_state_manager
+    manager: TVStateManager = request.app.state.tv_state_manager
 
     if manager is None:
         raise RuntimeError("TV state manager not initialized.")

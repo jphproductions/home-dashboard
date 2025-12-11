@@ -1,20 +1,20 @@
 """Spotify Web API service."""
 
-import httpx
-import time
-import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+import httpx
+
 from home_dashboard.config import Settings, get_settings
+from home_dashboard.exceptions import (
+    SpotifyAPIException,
+    SpotifyAuthException,
+    SpotifyException,
+    SpotifyNotAuthenticatedException,
+)
 from home_dashboard.models import SpotifyStatus
 from home_dashboard.services import tv_tizen_service
 from home_dashboard.state_managers import SpotifyAuthManager
-from home_dashboard.exceptions import (
-    SpotifyException,
-    SpotifyAuthException,
-    SpotifyNotAuthenticatedException,
-    SpotifyAPIException,
-)
 
 if TYPE_CHECKING:
     from home_dashboard.state_managers import TVStateManager
@@ -104,7 +104,7 @@ async def _get_access_token(
         response.raise_for_status()
         data = response.json()
 
-        access_token = data["access_token"]
+        access_token: str = data["access_token"]
         expires_in = data.get("expires_in", 3600)
 
         # Store in manager
