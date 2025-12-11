@@ -191,10 +191,29 @@ async def favicon():
 
 @app.exception_handler(DashboardException)
 async def dashboard_exception_handler(request, exc: DashboardException):
-    """Handle custom dashboard exceptions."""
-    logger.warning(f"Dashboard error: {exc.code} - {exc.message} on {request.method} {request.url}")
+    """Handle custom dashboard exceptions with proper HTTP status codes.
+    
+    Returns structured JSON error responses with status code, error code,
+    message, and optional details for client-side error handling.
+    """
+    logger.warning(
+        f"Dashboard error: {exc.code.value} - {exc.message} "
+        f"(status={exc.status_code}) on {request.method} {request.url}"
+    )
 
-    return JSONResponse(status_code=400, content={"error": {"code": exc.code, "message": exc.message}})
+    error_content: dict[str, Any] = {
+        "code": exc.code.value,
+        "message": exc.message,
+    }
+    
+    # Include details only if present (avoid empty objects)
+    if exc.details:
+        error_content["details"] = exc.details
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": error_content},
+    )
 
 
 @app.exception_handler(Exception)

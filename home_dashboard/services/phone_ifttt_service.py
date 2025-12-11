@@ -3,6 +3,7 @@
 import httpx
 from typing import Optional
 from home_dashboard.config import Settings, get_settings
+from home_dashboard.exceptions import PhoneException, IFTTTException
 
 
 async def ring_phone(client: httpx.AsyncClient, message: Optional[str] = None, settings: Settings | None = None) -> str:
@@ -33,7 +34,17 @@ async def ring_phone(client: httpx.AsyncClient, message: Optional[str] = None, s
         response.raise_for_status()
         return "Ring request sent to Jamie's phone"
     except httpx.HTTPError as e:
-        raise Exception(f"IFTTT webhook error: {str(e)}") from e
+        status_code = e.response.status_code if hasattr(e, "response") else 502
+        raise IFTTTException(
+            f"IFTTT webhook request failed: {str(e)}",
+            details={
+                "event_name": settings.ifttt_event_name,
+                "status_code": status_code,
+            },
+        ) from e
     except Exception as e:
         # Catch-all for network issues, timeouts, etc.
-        raise Exception(f"Failed to send ring request: {str(e)}") from e
+        raise PhoneException(
+            f"Failed to send ring request: {str(e)}",
+            details={"error_type": "network_error"},
+        ) from e

@@ -4,10 +4,20 @@ import httpx
 import time
 import threading
 from pathlib import Path
+from typing import TYPE_CHECKING
 from home_dashboard.config import Settings, get_settings
 from home_dashboard.models import SpotifyStatus
 from home_dashboard.services import tv_tizen_service
 from home_dashboard.state_managers import SpotifyAuthManager
+from home_dashboard.exceptions import (
+    SpotifyException,
+    SpotifyAuthException,
+    SpotifyNotAuthenticatedException,
+    SpotifyAPIException,
+)
+
+if TYPE_CHECKING:
+    from home_dashboard.state_managers import TVStateManager
 
 
 # NOTE: Global variables are deprecated and will be removed in future
@@ -32,7 +42,10 @@ def _save_refresh_token(refresh_token: str) -> None:
         TOKEN_FILE.write_text(refresh_token)
         TOKEN_FILE.chmod(0o600)  # Secure file permissions
     except Exception as e:
-        raise Exception(f"Failed to save refresh token: {str(e)}") from e
+        raise SpotifyException(
+            f"Failed to save refresh token: {str(e)}",
+            details={"error_type": "token_storage"},
+        ) from e
 
 
 def is_authenticated(settings: Settings | None = None) -> bool:
@@ -78,7 +91,10 @@ async def _get_access_token(
     # Get refresh token from file or settings
     refresh_token = _load_refresh_token() or settings.spotify_refresh_token
     if not refresh_token:
-        raise Exception("No refresh token available. Please authenticate first.")
+        raise SpotifyNotAuthenticatedException(
+            "No refresh token available. Please authenticate first.",
+            details={"auth_url": "/api/spotify/auth/login"},
+        )
 
     try:
         response = await client.post(
@@ -102,9 +118,15 @@ async def _get_access_token(
 
         return access_token
     except httpx.HTTPError as e:
-        raise Exception(f"Spotify auth error: {str(e)}") from e
+        raise SpotifyAuthException(
+            f"Spotify token refresh failed: {str(e)}",
+            details={"error_type": "token_refresh"},
+        ) from e
     except (KeyError, ValueError) as e:
-        raise Exception(f"Invalid Spotify auth response: {str(e)}") from e
+        raise SpotifyAuthException(
+            f"Invalid Spotify auth response: {str(e)}",
+            details={"error_type": "invalid_response"},
+        ) from e
 
 
 async def get_current_track(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, settings: Settings | None = None) -> SpotifyStatus:
@@ -148,7 +170,12 @@ async def get_current_track(client: httpx.AsyncClient, auth_manager: SpotifyAuth
             duration_ms=item.get("duration_ms") if item else None,
         )
     except httpx.HTTPError as e:
-        raise Exception(f"Spotify playback state error: {str(e)}") from e
+        status_code = e.response.status_code if hasattr(e, "response") else 502
+        raise SpotifyAPIException(
+            f"Failed to get playback state: {str(e)}",
+            status_code=status_code,
+            details={"operation": "get_current_track"},
+        ) from e
 
 
 async def play(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, settings: Settings | None = None) -> None:
@@ -171,7 +198,12 @@ async def play(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, sett
         )
         response.raise_for_status()
     except httpx.HTTPError as e:
-        raise Exception(f"Spotify play error: {str(e)}") from e
+        status_code = e.response.status_code if hasattr(e, "response") else 502
+        raise SpotifyAPIException(
+            f"Failed to start playback: {str(e)}",
+            status_code=status_code,
+            details={"operation": "play"},
+        ) from e
 
 
 async def pause(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, settings: Settings | None = None) -> None:
@@ -194,7 +226,12 @@ async def pause(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, set
         )
         response.raise_for_status()
     except httpx.HTTPError as e:
-        raise Exception(f"Spotify pause error: {str(e)}") from e
+        status_code = e.response.status_code if hasattr(e, "response") else 502
+        raise SpotifyAPIException(
+            f"Failed to pause playback: {str(e)}",
+            status_code=status_code,
+            details={"operation": "pause"},
+        ) from e
 
 
 async def next_track(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, settings: Settings | None = None) -> None:
@@ -217,7 +254,12 @@ async def next_track(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager
         )
         response.raise_for_status()
     except httpx.HTTPError as e:
-        raise Exception(f"Spotify next error: {str(e)}") from e
+        status_code = e.response.status_code if hasattr(e, "response") else 502
+        raise SpotifyAPIException(
+            f"Failed to skip to next track: {str(e)}",
+            status_code=status_code,
+            details={"operation": "next_track"},
+        ) from e
 
 
 async def previous_track(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, settings: Settings | None = None) -> None:
@@ -240,7 +282,12 @@ async def previous_track(client: httpx.AsyncClient, auth_manager: SpotifyAuthMan
         )
         response.raise_for_status()
     except httpx.HTTPError as e:
-        raise Exception(f"Spotify previous error: {str(e)}") from e
+        status_code = e.response.status_code if hasattr(e, "response") else 502
+        raise SpotifyAPIException(
+            f"Failed to skip to previous track: {str(e)}",
+            status_code=status_code,
+            details={"operation": "previous_track"},
+        ) from e
 
 
 async def wake_tv_and_play(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, tv_manager: 'TVStateManager', settings: Settings | None = None) -> str:
@@ -282,7 +329,10 @@ async def wake_tv_and_play(client: httpx.AsyncClient, auth_manager: SpotifyAuthM
 
         return "TV woken and playback transferred"
     except Exception as e:
-        raise Exception(f"Wake and play error: {str(e)}") from e
+        raise SpotifyException(
+            f"Failed to wake TV and play: {str(e)}",
+            details={"operation": "wake_and_play"},
+        ) from e
 
 
 async def play_playlist(client: httpx.AsyncClient, playlist_uri: str, auth_manager: SpotifyAuthManager, settings: Settings | None = None) -> None:
@@ -311,4 +361,9 @@ async def play_playlist(client: httpx.AsyncClient, playlist_uri: str, auth_manag
         )
         response.raise_for_status()
     except httpx.HTTPError as e:
-        raise Exception(f"Play playlist error: {str(e)}") from e
+        status_code = e.response.status_code if hasattr(e, "response") else 502
+        raise SpotifyAPIException(
+            f"Failed to play playlist: {str(e)}",
+            status_code=status_code,
+            details={"operation": "play_playlist"},
+        ) from e

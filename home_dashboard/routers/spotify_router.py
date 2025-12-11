@@ -33,6 +33,7 @@ SPOTIFY_SCOPES = [
 async def get_spotify_status(
     request: Request,
     client: httpx.AsyncClient = Depends(get_http_client),
+    auth_manager: SpotifyAuthManager = Depends(get_spotify_auth_manager),
     format: Literal["json", "html"] = Query(default="json", description="Response format"),
 ):
     """Get current Spotify playback status.
@@ -40,6 +41,7 @@ async def get_spotify_status(
     Args:
         request: FastAPI request object
         client: HTTP client from dependency injection
+        auth_manager: Spotify auth manager from dependency injection
         format: Response format - 'json' for API, 'html' for HTMX
 
     Returns:
@@ -47,10 +49,10 @@ async def get_spotify_status(
     """
     try:
         if format == "html":
-            return await TemplateRenderer.render_spotify_tile(request, client)
+            return await TemplateRenderer.render_spotify_tile(request, client, auth_manager)
 
         # JSON response
-        status = await spotify_service.get_current_track(client)
+        status = await spotify_service.get_current_track(client, auth_manager)
         return status
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Spotify error: {str(e)}") from e
@@ -202,7 +204,7 @@ async def wake_tv_and_play(
         await spotify_service.wake_tv_and_play(client, auth_manager, tv_manager)
 
         if format == "html":
-            return await TemplateRenderer.render_spotify_tile(request, client)
+            return await TemplateRenderer.render_spotify_tile(request, client, auth_manager)
 
         return {"status": "wake_and_play"}
     except Exception as e:

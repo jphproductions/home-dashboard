@@ -3,6 +3,7 @@
 import httpx
 from home_dashboard.config import Settings, get_settings
 from home_dashboard.models.weather import CurrentWeather, WeatherResponse
+from home_dashboard.exceptions import WeatherException, WeatherAPIException
 
 
 OPENWEATHER_URL = "https://api.openweathermap.org/data/2.5/weather"
@@ -44,8 +45,18 @@ async def get_current_weather(client: httpx.AsyncClient, settings: Settings | No
         return WeatherResponse.from_openweather(current_weather)
 
     except httpx.HTTPStatusError as e:
-        raise Exception(f"Weather API error (HTTP {e.response.status_code}): {e.response.text}") from e
+        raise WeatherAPIException(
+            f"Weather API request failed (HTTP {e.response.status_code}): {e.response.text}",
+            status_code=e.response.status_code,
+            details={"api_response": e.response.text},
+        ) from e
     except httpx.HTTPError as e:
-        raise Exception(f"Failed to fetch weather data: {str(e)}") from e
+        raise WeatherException(
+            f"Failed to fetch weather data: {str(e)}",
+            details={"error_type": "network_error"},
+        ) from e
     except Exception as e:
-        raise Exception(f"Failed to process weather data: {str(e)}") from e
+        raise WeatherException(
+            f"Failed to process weather data: {str(e)}",
+            details={"error_type": "data_processing"},
+        ) from e

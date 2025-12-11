@@ -4,6 +4,7 @@ import json
 import websockets
 from home_dashboard.config import Settings, get_settings
 from home_dashboard.state_managers import TVStateManager
+from home_dashboard.exceptions import TVException, TVConnectionException
 
 
 # NOTE: Global state is deprecated - use TVStateManager via dependency injection
@@ -53,7 +54,7 @@ async def wake(settings: Settings | None = None, tv_manager: TVStateManager | No
 
         # Wait for response
         response = await ws.recv()
-        print(f"TV handshake response: {response}")
+        print(f"TV handshake response: {response!r}")
 
         # Send KEY_POWER
         key_command = {
@@ -83,23 +84,35 @@ async def wake(settings: Settings | None = None, tv_manager: TVStateManager | No
         else:
             print(f"TV wake failed: {str(e)}")
 
-        raise Exception(f"Tizen wake error: {str(e)}") from e
+        raise TVConnectionException(
+            f"Failed to connect to TV: {str(e)}",
+            details={
+                "tv_ip": settings.tv_ip,
+                "error_type": "websocket_connection",
+            },
+        ) from e
     finally:
         # Ensure WebSocket is always closed
         if ws:
             await ws.close()
 
 
-async def get_status() -> bool:
+async def get_status(settings: Settings | None = None) -> bool:
     """
     Get TV power status (experimental).
+
+    Args:
+        settings: Settings instance (defaults to singleton)
 
     Returns:
         True if TV is on, False if off.
 
     Raises:
-        Exception if status check fails.
+        TVException if status check fails.
     """
+    if settings is None:
+        settings = get_settings()
+    
     try:
         # This is a placeholder; actual power state detection via Tizen is unreliable
         # Try to connect as a simple test
