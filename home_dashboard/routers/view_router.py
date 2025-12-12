@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 
 from home_dashboard.dependencies import get_http_client, get_spotify_auth_manager
+from home_dashboard.security import verify_api_key
 from home_dashboard.state_managers import SpotifyAuthManager
 from home_dashboard.views.template_renderer import TemplateRenderer
 
@@ -17,7 +18,7 @@ async def index(request: Request):
     return TemplateRenderer.render_index(request)
 
 
-@router.get("/tiles/spotify", response_class=HTMLResponse)
+@router.get("/tiles/spotify", response_class=HTMLResponse, dependencies=[Depends(verify_api_key)])
 async def spotify_tile(
     request: Request,
     client: httpx.AsyncClient = Depends(get_http_client),
@@ -27,25 +28,25 @@ async def spotify_tile(
     return await TemplateRenderer.render_spotify_tile(request, client, auth_manager)
 
 
-@router.get("/tiles/weather", response_class=HTMLResponse)
+@router.get("/tiles/weather", response_class=HTMLResponse, dependencies=[Depends(verify_api_key)])
 async def weather_tile(request: Request, client: httpx.AsyncClient = Depends(get_http_client)):
     """Render Weather tile fragment."""
     return await TemplateRenderer.render_weather_tile(request, client)
 
 
-@router.get("/tiles/phone", response_class=HTMLResponse)
+@router.get("/tiles/phone", response_class=HTMLResponse, dependencies=[Depends(verify_api_key)])
 async def phone_tile(request: Request):
     """Render Phone tile fragment."""
     return TemplateRenderer.render_phone_tile(request)
 
 
-@router.get("/tiles/quick-actions", response_class=HTMLResponse)
+@router.get("/tiles/quick-actions", response_class=HTMLResponse, dependencies=[Depends(verify_api_key)])
 async def quick_actions_tile(request: Request):
     """Render Quick Actions tile fragment."""
     return TemplateRenderer.render_quick_actions_tile(request)
 
 
-@router.get("/tiles/status", response_class=HTMLResponse)
+@router.get("/tiles/status", response_class=HTMLResponse, dependencies=[Depends(verify_api_key)])
 async def status_tile(request: Request):
     """Render Status tile fragment."""
     return TemplateRenderer.render_status_tile(request)

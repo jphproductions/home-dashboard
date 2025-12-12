@@ -13,6 +13,7 @@ from home_dashboard.exceptions import (
     SpotifyException,
     SpotifyNotAuthenticatedException,
 )
+from home_dashboard.logging_config import get_logger, log_with_context
 from home_dashboard.models import SpotifyStatus
 from home_dashboard.services import tv_tizen_service
 from home_dashboard.state_managers import SpotifyAuthManager
@@ -20,6 +21,7 @@ from home_dashboard.state_managers import SpotifyAuthManager
 if TYPE_CHECKING:
     from home_dashboard.state_managers import TVStateManager
 
+logger = get_logger(__name__)
 
 # NOTE: Global variables are deprecated and will be removed in future
 # Use SpotifyAuthManager via dependency injection instead
@@ -93,10 +95,23 @@ async def _get_access_token(
     # Get refresh token from file or settings
     refresh_token = _load_refresh_token() or settings.spotify_refresh_token
     if not refresh_token:
+        log_with_context(
+            logger,
+            "error",
+            "No Spotify refresh token available",
+            event_type="spotify_auth_error",
+        )
         raise SpotifyNotAuthenticatedException(
             "No refresh token available. Please authenticate first.",
             details={"auth_url": "/api/spotify/auth/login"},
         )
+
+    log_with_context(
+        logger,
+        "debug",
+        "Refreshing Spotify access token",
+        event_type="spotify_token_refresh",
+    )
 
     try:
         response = await client.post(
@@ -105,6 +120,16 @@ async def _get_access_token(
             data={"grant_type": "refresh_token", "refresh_token": refresh_token},
             timeout=10.0,
         )
+
+        log_with_context(
+            logger,
+            "debug",
+            "Spotify token refresh response",
+            event_type="spotify_token_response",
+            status_code=response.status_code,
+            response_text=response.text if response.status_code != 200 else None,
+        )
+
         response.raise_for_status()
         data = response.json()
 
@@ -114,17 +139,43 @@ async def _get_access_token(
         # Store in manager
         await auth_manager.set_token(access_token, expires_in)
 
+        log_with_context(
+            logger,
+            "info",
+            "Spotify access token refreshed successfully",
+            event_type="spotify_token_success",
+            expires_in=expires_in,
+        )
+
         # If a new refresh token is provided, save it
         if "refresh_token" in data:
             _save_refresh_token(data["refresh_token"])
 
         return access_token
     except httpx.HTTPError as e:
+        status_code = e.response.status_code if hasattr(e, "response") else None
+        response_text = e.response.text if hasattr(e, "response") else None
+        log_with_context(
+            logger,
+            "error",
+            "Spotify token refresh failed",
+            event_type="spotify_token_error",
+            status_code=status_code,
+            error=str(e),
+            response_body=response_text,
+        )
         raise SpotifyAuthException(
             f"Spotify token refresh failed: {str(e)}",
-            details={"error_type": "token_refresh"},
+            details={"error_type": "token_refresh", "status_code": status_code},
         ) from e
     except (KeyError, ValueError) as e:
+        log_with_context(
+            logger,
+            "error",
+            "Invalid Spotify auth response",
+            event_type="spotify_auth_parse_error",
+            error=str(e),
+        )
         raise SpotifyAuthException(
             f"Invalid Spotify auth response: {str(e)}",
             details={"error_type": "invalid_response"},
@@ -157,6 +208,12 @@ async def get_current_track(
 
     async def fetch_current_track() -> SpotifyStatus:
         """Fetch fresh playback status from Spotify API."""
+        log_with_context(
+            logger,
+            "debug",
+            "Fetching Spotify playback status",
+            event_type="spotify_status_fetch",
+        )
         try:
             token = await _get_access_token(client, auth_manager, settings)
             response = await client.get(
@@ -164,6 +221,15 @@ async def get_current_track(
                 headers={"Authorization": f"Bearer {token}"},
                 timeout=10.0,
             )
+
+            log_with_context(
+                logger,
+                "debug",
+                "Spotify playback status response",
+                event_type="spotify_status_response",
+                status_code=response.status_code,
+            )
+
             response.raise_for_status()
             data = response.json() if response.status_code != 204 else {}
 
@@ -171,7 +237,7 @@ async def get_current_track(
             item = data.get("item") or {}
             device = data.get("device") or {}
 
-            return SpotifyStatus(
+            status = SpotifyStatus(
                 is_playing=is_playing,
                 track_name=item.get("name"),
                 artist_name=item.get("artists", [{}])[0].get("name") if item.get("artists") else None,
@@ -179,8 +245,31 @@ async def get_current_track(
                 progress_ms=data.get("progress_ms"),
                 duration_ms=item.get("duration_ms") if item else None,
             )
+
+            log_with_context(
+                logger,
+                "info",
+                "Spotify playback status retrieved",
+                event_type="spotify_status_success",
+                is_playing=is_playing,
+                track=item.get("name"),
+                artist=item.get("artists", [{}])[0].get("name") if item.get("artists") else None,
+                device=device.get("name"),
+            )
+
+            return status
         except httpx.HTTPError as e:
             status_code = e.response.status_code if hasattr(e, "response") else 502
+            response_text = e.response.text if hasattr(e, "response") else None
+            log_with_context(
+                logger,
+                "error",
+                "Failed to get Spotify playback state",
+                event_type="spotify_status_error",
+                status_code=status_code,
+                error=str(e),
+                response_body=response_text,
+            )
             raise SpotifyAPIException(
                 f"Failed to get playback state: {str(e)}",
                 status_code=status_code,
@@ -202,6 +291,8 @@ async def play(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, sett
     if settings is None:
         settings = get_settings()
 
+    log_with_context(logger, "info", "Starting Spotify playback", event_type="spotify_play")
+
     try:
         token = await _get_access_token(client, auth_manager, settings)
         response = await client.put(
@@ -209,9 +300,29 @@ async def play(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, sett
             headers={"Authorization": f"Bearer {token}"},
             timeout=10.0,
         )
+
+        log_with_context(
+            logger,
+            "debug",
+            "Spotify play response",
+            event_type="spotify_play_response",
+            status_code=response.status_code,
+        )
+
         response.raise_for_status()
+        log_with_context(logger, "info", "Spotify playback started", event_type="spotify_play_success")
     except httpx.HTTPError as e:
         status_code = e.response.status_code if hasattr(e, "response") else 502
+        response_text = e.response.text if hasattr(e, "response") else None
+        log_with_context(
+            logger,
+            "error",
+            "Failed to start Spotify playback",
+            event_type="spotify_play_error",
+            status_code=status_code,
+            error=str(e),
+            response_body=response_text,
+        )
         raise SpotifyAPIException(
             f"Failed to start playback: {str(e)}",
             status_code=status_code,
@@ -230,6 +341,8 @@ async def pause(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, set
     if settings is None:
         settings = get_settings()
 
+    log_with_context(logger, "info", "Pausing Spotify playback", event_type="spotify_pause")
+
     try:
         token = await _get_access_token(client, auth_manager, settings)
         response = await client.put(
@@ -237,9 +350,29 @@ async def pause(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, set
             headers={"Authorization": f"Bearer {token}"},
             timeout=10.0,
         )
+
+        log_with_context(
+            logger,
+            "debug",
+            "Spotify pause response",
+            event_type="spotify_pause_response",
+            status_code=response.status_code,
+        )
+
         response.raise_for_status()
+        log_with_context(logger, "info", "Spotify playback paused", event_type="spotify_pause_success")
     except httpx.HTTPError as e:
         status_code = e.response.status_code if hasattr(e, "response") else 502
+        response_text = e.response.text if hasattr(e, "response") else None
+        log_with_context(
+            logger,
+            "error",
+            "Failed to pause Spotify playback",
+            event_type="spotify_pause_error",
+            status_code=status_code,
+            error=str(e),
+            response_body=response_text,
+        )
         raise SpotifyAPIException(
             f"Failed to pause playback: {str(e)}",
             status_code=status_code,

@@ -35,6 +35,15 @@ async def verify_api_key(
     """
     api_key = os.getenv("DASHBOARD_API_KEY", "").strip()
 
+    # Debug logging
+    log_with_context(
+        logger,
+        "debug",
+        f"API key check: configured={bool(api_key)}, has_credentials={bool(credentials)}",
+        event_type="auth_check",
+        path=str(request.url),
+    )
+
     # API key is REQUIRED
     if not api_key:
         log_with_context(
@@ -45,8 +54,9 @@ async def verify_api_key(
             path=str(request.url),
         )
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Authentication not configured",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication not configured - DASHBOARD_API_KEY environment variable is missing",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
     # Check if credentials provided
@@ -106,5 +116,5 @@ def get_trusted_hosts() -> list[str]:
     Returns:
         List of trusted host patterns
     """
-    hosts_env = os.getenv("TRUSTED_HOSTS", "localhost,127.0.0.1,192.168.178.*")
+    hosts_env = os.getenv("TRUSTED_HOSTS", "localhost,127.0.0.1,*.local")
     return [host.strip() for host in hosts_env.split(",")]

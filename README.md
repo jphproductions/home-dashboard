@@ -90,18 +90,75 @@ See [infra/systemd/](infra/systemd/) for configuration.
 
 ## API Documentation
 
-Coming soon
+Full interactive documentation available at `/docs` when server is running.
 
-Quick reference:
+### Health & Monitoring
 
-- `/` - Main dashboard page
-- `/health` - Health check
-- `/api/weather/current?format=json|html` - Current weather
-- `/api/spotify/status?format=json|html` - Spotify status
-- `/api/spotify/play?format=json|html` - Play music
-- `/api/tv/wake` - Wake TV
-- `/api/phone/ring?format=json|html` - Ring phone
-- `/docs` - Interactive API documentation (Swagger UI)
+- **`/health`** - Basic health check (returns `{"status": "ok", "version": "0.1.0"}`)
+  - Used by Docker healthcheck
+- **`/health/live`** - Liveness probe (is app running?)
+  - Always returns 200 if process is alive
+  - Use for Kubernetes/Docker liveness probes
+- **`/health/ready`** - Readiness probe (can serve traffic?)
+  - Checks external dependencies (Weather API, Spotify auth)
+  - Returns 200 if ready, 503 if not ready
+  - Rate limited: 30/minute
+  - Caches external checks for 60s
+- **`/debug`** - System diagnostics (requires API key)
+  - Shows version, uptime, auth status, cache stats, config
+  - Protected endpoint for troubleshooting
+
+### API Endpoints
+
+All endpoints support `?format=json` (default) or `?format=html` for HTMX fragments.
+
+**Weather:**
+- `/api/weather/current` - Get current weather conditions
+
+**Spotify:**
+- `/api/spotify/status` - Get current playback status
+- `/api/spotify/play` - Resume playback
+- `/api/spotify/pause` - Pause playback
+- `/api/spotify/next` - Skip to next track
+- `/api/spotify/previous` - Go to previous track
+- `/api/spotify/auth/login` - Initiate Spotify OAuth flow
+- `/api/spotify/auth/status` - Check authentication status
+
+**TV:**
+- `/api/tv/wake` - Wake Samsung TV via Wake-on-LAN
+- `/api/tv/status` - Get TV state info
+
+**Phone:**
+- `/api/phone/ring` - Trigger IFTTT webhook to ring phone (requires API key)
+
+### Authentication
+
+Most API endpoints require Bearer token authentication. Get your API key from `.env` file.
+
+**Using `/docs` (Swagger UI):**
+1. Click the **"Authorize"** 🔓 button at the top
+2. Enter your API key (without "Bearer" prefix)
+3. All "Try it out" requests will auto-include auth
+
+**Using curl:**
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" http://localhost:8000/api/phone/ring
+```
+
+### Rate Limits
+
+- Most endpoints: 60 requests/minute per IP
+- Phone ring: 5 requests/minute (abuse prevention)
+- Spotify play/pause: 30 requests/minute
+- Health ready: 30 requests/minute
+
+## Interactive API Docs
+
+Visit **`http://localhost:8000/docs`** for full interactive API documentation with:
+- Request/response examples
+- "Try it out" functionality
+- Authentication support
+- Full endpoint descriptions
 
 ## Development
 

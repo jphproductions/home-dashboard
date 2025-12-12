@@ -8,14 +8,45 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from home_dashboard.dependencies import get_http_client
+from home_dashboard.security import verify_api_key
 from home_dashboard.services import weather_service
 from home_dashboard.views.template_renderer import TemplateRenderer
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(verify_api_key)])
 limiter = Limiter(key_func=get_remote_address)
 
 
-@router.get("/current")
+@router.get(
+    "/current",
+    summary="Get current weather",
+    description="""
+    Retrieves current weather conditions from OpenWeatherMap API.
+
+    Includes temperature, conditions, wind speed, and clothing recommendations.
+    Results are cached for 5 minutes to reduce API calls.
+
+    **Rate Limited:** 60 requests/minute
+    """,
+    responses={
+        200: {
+            "description": "Successful response",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "location": "s-Hertogenbosch",
+                        "temp": 12.5,
+                        "condition": "Cloudy",
+                        "wind_speed": 5.2,
+                        "wind_deg": 180,
+                        "humidity": 75,
+                        "clothing_recommendation": "Wear a jacket",
+                    }
+                }
+            },
+        },
+        500: {"description": "Weather API error or configuration issue"},
+    },
+)
 @limiter.limit("60/minute")
 async def get_current_weather(
     request: Request,

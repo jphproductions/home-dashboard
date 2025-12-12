@@ -6,13 +6,39 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from home_dashboard.dependencies import get_http_client, get_tv_state_manager
+from home_dashboard.security import verify_api_key
 from home_dashboard.services import tv_tizen_service
 from home_dashboard.state_managers import TVStateManager
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(verify_api_key)])
 
 
-@router.post("/wake")
+@router.post(
+    "/wake",
+    summary="Wake Samsung TV",
+    description="""
+    Sends Wake-on-LAN magic packet to Samsung Tizen TV.
+
+    Uses retry logic with exponential backoff (3 attempts: 1s, 2s, 4s delays).
+
+    **Note:** TV must be on the same network and have Wake-on-LAN enabled.
+    """,
+    responses={
+        200: {
+            "description": "Wake command sent successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "wol_sent",
+                        "action": "wake_tv",
+                        "message": "TV woken successfully",
+                    }
+                }
+            },
+        },
+        500: {"description": "TV wake error after retries"},
+    },
+)
 async def wake_tv(
     client: httpx.AsyncClient = Depends(get_http_client),
     tv_manager: TVStateManager = Depends(get_tv_state_manager),

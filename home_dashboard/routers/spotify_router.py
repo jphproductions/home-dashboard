@@ -13,11 +13,12 @@ from slowapi.util import get_remote_address
 
 from home_dashboard.config import Settings, get_settings
 from home_dashboard.dependencies import get_http_client, get_spotify_auth_manager, get_tv_state_manager
+from home_dashboard.security import verify_api_key
 from home_dashboard.services import spotify_service
 from home_dashboard.state_managers import SpotifyAuthManager, TVStateManager
 from home_dashboard.views.template_renderer import TemplateRenderer
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(verify_api_key)])
 limiter = Limiter(key_func=get_remote_address)
 
 # Store state for OAuth flow (in production, use Redis or database)
@@ -33,7 +34,37 @@ SPOTIFY_SCOPES = [
 ]
 
 
-@router.get("/status")
+@router.get(
+    "/status",
+    summary="Get Spotify playback status",
+    description="""
+    Retrieves the current playback status from Spotify.
+
+    Returns track information, playback state, and device name.
+    Cached for 5 seconds to reduce API calls.
+
+    **Note:** Requires Spotify authentication. Visit `/api/spotify/auth/login` first if not authenticated.
+    """,
+    responses={
+        200: {
+            "description": "Successful response",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "is_playing": True,
+                        "track_name": "Bohemian Rhapsody",
+                        "artist_name": "Queen",
+                        "device_name": "Living Room TV",
+                        "progress_ms": 125000,
+                        "duration_ms": 354000,
+                    }
+                }
+            },
+        },
+        401: {"description": "Not authenticated - visit /api/spotify/auth/login"},
+        500: {"description": "Spotify API error"},
+    },
+)
 @limiter.limit("60/minute")
 async def get_spotify_status(
     request: Request,
@@ -63,7 +94,25 @@ async def get_spotify_status(
         raise HTTPException(status_code=500, detail=f"Spotify error: {str(e)}") from e
 
 
-@router.post("/play")
+@router.post(
+    "/play",
+    summary="Resume Spotify playback",
+    description="""
+    Resume playback on the active Spotify device.
+
+    If no device is active, you may need to start playback manually first.
+
+    **Rate Limited:** 30 requests/minute
+    """,
+    responses={
+        200: {
+            "description": "Playback resumed successfully",
+            "content": {"application/json": {"example": {"status": "playing"}}},
+        },
+        401: {"description": "Not authenticated"},
+        500: {"description": "Spotify API error (no active device, etc.)"},
+    },
+)
 @limiter.limit("30/minute")
 async def play(
     request: Request,
@@ -94,7 +143,19 @@ async def play(
         raise HTTPException(status_code=500, detail=f"Spotify error: {str(e)}") from e
 
 
-@router.post("/pause")
+@router.post(
+    "/pause",
+    summary="Pause Spotify playback",
+    description="Pause playback on the active Spotify device.",
+    responses={
+        200: {
+            "description": "Playback paused successfully",
+            "content": {"application/json": {"example": {"status": "paused"}}},
+        },
+        401: {"description": "Not authenticated"},
+        500: {"description": "Spotify API error"},
+    },
+)
 async def pause(
     request: Request,
     client: httpx.AsyncClient = Depends(get_http_client),

@@ -16,7 +16,28 @@ router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
 
-@router.post("/ring", dependencies=[Depends(verify_api_key)])
+@router.post(
+    "/ring",
+    dependencies=[Depends(verify_api_key)],
+    summary="Trigger phone ring via IFTTT",
+    description="""
+    Triggers an IFTTT webhook to ring a phone.
+
+    **🔒 Authentication Required:** This endpoint requires Bearer token authentication.
+
+    **⚡ Rate Limited:** 5 requests/minute to prevent abuse.
+
+    Use this to locate a phone or get someone's attention.
+    """,
+    responses={
+        200: {
+            "description": "Webhook triggered successfully",
+            "content": {"application/json": {"example": {"status": "webhook_triggered", "action": "ring_phone"}}},
+        },
+        401: {"description": "Unauthorized - missing or invalid API key"},
+        500: {"description": "IFTTT webhook error"},
+    },
+)
 @limiter.limit("5/minute")
 async def ring_phone(
     request: Request,
