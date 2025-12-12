@@ -3,7 +3,6 @@ name = "home-dashboard"
 version = "0.3.0"
 description = "Home Dashboard"
 authors = ["Jelle Hilbrands <jelle.hilbrands@outlook.com>"]
-# packages = [{include = "home_dashboard"}]
 include = ["home_dashboard/py.typed"]
 
 [tool.poetry.dependencies]

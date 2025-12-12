@@ -1,6 +1,5 @@
 """Spotify Web API service."""
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import httpx
@@ -23,46 +22,22 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-# NOTE: Global variables are deprecated and will be removed in future
-# Use SpotifyAuthManager via dependency injection instead
-# Path to store refresh token persistently
-TOKEN_FILE = Path.home() / ".spotify_refresh_token"
-
 # Cache configuration
 SPOTIFY_STATUS_CACHE_TTL = 5  # 5 seconds - status changes frequently
 
 
-def _load_refresh_token() -> str | None:
-    """Load refresh token from file."""
-    if TOKEN_FILE.exists():
-        try:
-            return TOKEN_FILE.read_text().strip()
-        except Exception:
-            return None
-    return None
-
-
-def _save_refresh_token(refresh_token: str) -> None:
-    """Save refresh token to file."""
-    try:
-        TOKEN_FILE.write_text(refresh_token)
-        TOKEN_FILE.chmod(0o600)  # Secure file permissions
-    except Exception as e:
-        raise SpotifyException(
-            f"Failed to save refresh token: {str(e)}",
-            details={"error_type": "token_storage"},
-        ) from e
-
-
 def is_authenticated(settings: Settings | None = None) -> bool:
-    """Check if we have a refresh token available.
+    """Check if we have a refresh token available in settings.
 
     Args:
         settings: Settings instance (defaults to singleton)
+
+    Returns:
+        True if refresh token is configured in .env file
     """
     if settings is None:
         settings = get_settings()
-    return _load_refresh_token() is not None or bool(settings.spotify_refresh_token)
+    return bool(settings.spotify_refresh_token)
 
 
 async def _get_access_token(
@@ -92,8 +67,8 @@ async def _get_access_token(
     if cached_token:
         return cached_token
 
-    # Get refresh token from file or settings
-    refresh_token = _load_refresh_token() or settings.spotify_refresh_token
+    # Get refresh token from settings (.env file)
+    refresh_token = settings.spotify_refresh_token
     if not refresh_token:
         log_with_context(
             logger,
@@ -147,9 +122,15 @@ async def _get_access_token(
             expires_in=expires_in,
         )
 
-        # If a new refresh token is provided, save it
+        # Note: If Spotify returns a new refresh token, user must update .env manually
+        # This happens rarely, usually on first auth or security events
         if "refresh_token" in data:
-            _save_refresh_token(data["refresh_token"])
+            log_with_context(
+                logger,
+                "warning",
+                "Spotify returned new refresh token - update SPOTIFY_REFRESH_TOKEN in .env",
+                event_type="spotify_new_refresh_token",
+            )
 
         return access_token
     except httpx.HTTPError as e:

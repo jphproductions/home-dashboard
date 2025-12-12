@@ -417,15 +417,128 @@ async def auth_callback(
         response.raise_for_status()
         data = response.json()
 
-        # Save refresh token
+        # Get refresh token
         refresh_token = data.get("refresh_token")
         if not refresh_token:
             raise HTTPException(status_code=500, detail="No refresh token received")
 
-        spotify_service._save_refresh_token(refresh_token)
+        # Display token for user to copy to .env file
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Spotify Authentication Successful</title>
+            <style>
+                body {{
+                    font-family: Arial, sans-serif;
+                    max-width: 800px;
+                    margin: 50px auto;
+                    padding: 20px;
+                    background-color: #f5f5f5;
+                }}
+                .container {{
+                    background-color: white;
+                    padding: 30px;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                }}
+                h1 {{
+                    color: #1DB954;
+                }}
+                .token-box {{
+                    background-color: #f0f0f0;
+                    padding: 15px;
+                    border-radius: 4px;
+                    font-family: monospace;
+                    word-break: break-all;
+                    margin: 20px 0;
+                    border: 1px solid #ddd;
+                }}
+                .instructions {{
+                    background-color: #fff3cd;
+                    padding: 15px;
+                    border-radius: 4px;
+                    border-left: 4px solid #ffc107;
+                    margin: 20px 0;
+                }}
+                .instructions ol {{
+                    margin: 10px 0;
+                    padding-left: 20px;
+                }}
+                button {{
+                    background-color: #1DB954;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 16px;
+                    margin-top: 10px;
+                }}
+                button:hover {{
+                    background-color: #1ed760;
+                }}
+                .success {{
+                    color: #1DB954;
+                    font-weight: bold;
+                }}
+                a {{
+                    color: #1DB954;
+                    text-decoration: none;
+                }}
+                a:hover {{
+                    text-decoration: underline;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>✅ Spotify Authentication Successful!</h1>
 
-        # Redirect back to dashboard homepage
-        return RedirectResponse(url="/", status_code=303)
+                <div class="instructions">
+                    <strong>⚠️ Important: Complete Setup</strong>
+                    <ol>
+                        <li>Copy the refresh token below</li>
+                        <li>Open your <code>.env</code> file</li>
+                        <li>Set <code>SPOTIFY_REFRESH_TOKEN=your_token_here</code></li>
+                        <li>Restart the dashboard application</li>
+                    </ol>
+                </div>
+
+                <h3>Your Refresh Token:</h3>
+                <div class="token-box" id="token">{refresh_token}</div>
+
+                <button onclick="copyToken()">📋 Copy Token to Clipboard</button>
+                <span id="copyStatus" style="margin-left: 10px; color: #1DB954;"></span>
+
+                <p style="margin-top: 30px;">
+                    <strong>Note:</strong> This token will only be shown once.
+                    Keep it secure and don't share it publicly.
+                </p>
+
+                <p>
+                    <a href="/">← Return to Dashboard</a>
+                </p>
+            </div>
+
+            <script>
+                function copyToken() {{
+                    const token = document.getElementById('token').textContent;
+                    navigator.clipboard.writeText(token).then(function() {{
+                        document.getElementById('copyStatus').textContent = '✓ Copied!';
+                        setTimeout(function() {{
+                            document.getElementById('copyStatus').textContent = '';
+                        }}, 2000);
+                    }}, function(err) {{
+                        document.getElementById('copyStatus').textContent = '✗ Copy failed - please select and copy manually';
+                        document.getElementById('copyStatus').style.color = 'red';
+                    }});
+                }}
+            </script>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
 
     except httpx.HTTPError as e:
         raise HTTPException(status_code=500, detail=f"Token exchange failed: {str(e)}") from e

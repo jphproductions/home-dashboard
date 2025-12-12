@@ -3,9 +3,6 @@
 .env.local
 *.pyc
 __pycache__/
-.pytest_cache/
-.coverage
-htmlcov/
 .mypy_cache/
 .ruff_cache/
 
@@ -14,10 +11,7 @@ logs/
 *.log
 
 # Python
-venv/
 .venv/
-env/
-.env/
 *.egg-info/
 dist/
 build/

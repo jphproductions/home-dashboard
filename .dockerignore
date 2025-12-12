@@ -22,17 +22,6 @@ ENV/
 *.swo
 *~
 
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-
-# Documentation
-docs/
-*.md
-!README.md
-
 # Docker
 docker/
 Dockerfile*
@@ -46,6 +35,5 @@ docker-compose*.yml
 *.log
 .DS_Store
 .env.example
-tests/
 infra/
 LICENCE
