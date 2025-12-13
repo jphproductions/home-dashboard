@@ -7,32 +7,32 @@
         <strong>Spotify Not Connected</strong><br>
         Connect your Spotify account to control playback.
     </div>
-    <a href="/api/spotify/auth/login" class="button button-primary">
+    <a href="/api/spotify/auth/login" class="button">
         🔗 Authenticate Spotify
     </a>
-    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 1rem;">
+    <p class="spotify-auth-note">
         You'll be redirected to Spotify, then automatically back to this dashboard.
     </p>
 
     {% else %}
     <!-- Current Track Info -->
     {% if track_name %}
-    <div style="margin-bottom: 1.5rem;">
+    <div class="spotify-track-info">
         <strong>Now Playing:</strong><br>
         🎵 {{ track_name }}<br>
         {% if artist_name %}👤 {{ artist_name }}<br>{% endif %}
         {% if device_name %}📱 {{ device_name }}{% endif %}
     </div>
     {% else %}
-    <div style="margin-bottom: 1.5rem; color: var(--text-secondary);">
+    <div class="spotify-track-info caption">
         Nothing currently playing
     </div>
     {% endif %}
 
     <!-- Playlist Selection -->
-    <div style="margin-bottom: 1.5rem;">
+    <div class="spotify-section">
         <strong>Select Playlist:</strong>
-        <div style="display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; margin-top: 0.5rem;">
+        <div class="spotify-playlist-grid">
             <select id="playlist-select" name="playlist">
                 <option value="">Select...</option>
                 {% for playlist in playlists %}
@@ -40,19 +40,18 @@
                 {% endfor %}
             </select>
             <button
-                class="button button-secondary"
+                class="button button-secondary button-nowrap"
                 hx-post="/api/spotify/play-playlist-from-form"
                 hx-include="#playlist-select"
                 hx-target="#spotify-tile"
-                hx-swap="outerHTML"
-                style="white-space: nowrap;">
+                hx-swap="outerHTML">
                 ▶️ Play
             </button>
         </div>
     </div>
 
     <!-- Playback Controls -->
-    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-bottom: 1.5rem;">
+    <div class="spotify-controls">
         <button
             class="button button-secondary"
             hx-post="/api/spotify/previous"
@@ -97,11 +96,10 @@
 
     <!-- Wake TV & Play -->
     <button
-        class="button button-primary"
+        class="button button-full-width"
         hx-post="/api/spotify/wake-and-play"
         hx-target="#spotify-tile"
-        hx-swap="outerHTML"
-        style="width: 100%;">
+        hx-swap="outerHTML">
         📺 Wake TV & Play
     </button>
 

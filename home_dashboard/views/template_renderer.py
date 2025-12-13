@@ -9,15 +9,18 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from home_dashboard.config import Settings, get_settings
+from home_dashboard.config import Settings
+from home_dashboard.logging_config import get_logger, log_with_context
 from home_dashboard.services import spotify_service, weather_service
 
 if TYPE_CHECKING:
     from home_dashboard.state_managers import SpotifyAuthManager
 
 
+logger = get_logger(__name__)
+
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 
 class TemplateRenderer:
@@ -33,7 +36,7 @@ class TemplateRenderer:
         request: Request,
         client: httpx.AsyncClient,
         auth_manager: "SpotifyAuthManager",
-        settings: Settings | None = None,
+        settings: Settings,
     ) -> HTMLResponse:
         """Render Spotify tile fragment.
 
@@ -41,14 +44,11 @@ class TemplateRenderer:
             request: FastAPI request object
             client: HTTP client for API calls
             auth_manager: Spotify authentication manager
-            settings: Settings instance (defaults to singleton)
+            settings: Settings instance (must be provided by router via Depends)
 
         Returns:
             HTMLResponse with rendered Spotify tile
         """
-        if settings is None:
-            settings = get_settings()
-
         # Check authentication
         authenticated = spotify_service.is_authenticated(settings)
 
@@ -64,7 +64,15 @@ class TemplateRenderer:
         # Get current track status
         try:
             track_data = await spotify_service.get_current_track(client, auth_manager, settings)
-        except Exception:
+        except Exception as e:
+            log_with_context(
+                logger,
+                "warning",
+                "Failed to get current Spotify track",
+                error=str(e),
+                error_type=type(e).__name__,
+                event_type="spotify_track_error",
+            )
             track_data = None
 
         # Get playlists from config
@@ -89,18 +97,20 @@ class TemplateRenderer:
     async def render_weather_tile(
         request: Request,
         client: httpx.AsyncClient,
+        settings: Settings,
     ) -> HTMLResponse:
         """Render Weather tile fragment.
 
         Args:
             request: FastAPI request object
             client: HTTP client for API calls
+            settings: Settings instance (must be provided by router via Depends)
 
         Returns:
             HTMLResponse with rendered weather tile
         """
         try:
-            weather = await weather_service.get_current_weather(client)
+            weather = await weather_service.get_current_weather(client, settings)
 
             return templates.TemplateResponse(
                 "tiles/weather.html",
@@ -115,12 +125,20 @@ class TemplateRenderer:
                     "wind_direction": weather.wind_direction_compass,
                     "beaufort": weather.beaufort_scale,
                     "beaufort_description": weather.beaufort_description,
-                    "weather_emoji": weather.weather_emoji,
+                    "icon_url": weather.icon_url,
                     "recommendation": weather.recommendation,
                     "error": None,
                 },
             )
         except Exception as e:
+            log_with_context(
+                logger,
+                "warning",
+                "Failed to get weather data",
+                error=str(e),
+                error_type=type(e).__name__,
+                event_type="weather_error",
+            )
             return templates.TemplateResponse(
                 "tiles/weather.html",
                 {

@@ -1,16 +1,15 @@
-<div id="status-tile" class="status-area" style="padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
-    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; align-items: center;">
+<div id="status-tile" class="status-area status-bar">
+    <div class="status-grid">
         <div>
             ⏰ Last updated: {{ last_updated }}
         </div>
-        <div style="text-align: center;">
+        <div class="status-center">
             ✅ All systems operational
         </div>
-        <div style="text-align: right;">
+        <div class="status-right">
             <button
-                class="button button-secondary"
-                onclick="location.reload()"
-                style="font-size: 0.9rem; padding: 0.4rem 0.8rem;">
+                class="button button-secondary button-small"
+                onclick="location.reload()">
                 🔄 Refresh
             </button>
         </div>

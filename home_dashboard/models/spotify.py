@@ -3,7 +3,7 @@
 from pydantic import BaseModel
 
 
-class SpotifyStatus(BaseModel):
+class SpotifyPlaybackState(BaseModel):
     """Current Spotify playback status."""
 
     is_playing: bool
@@ -12,10 +12,3 @@ class SpotifyStatus(BaseModel):
     device_name: str | None = None
     progress_ms: int | None = None
     duration_ms: int | None = None
-
-
-class SpotifyPlayRequest(BaseModel):
-    """Request to play a track or context."""
-
-    context_uri: str | None = None
-    device_id: str | None = None

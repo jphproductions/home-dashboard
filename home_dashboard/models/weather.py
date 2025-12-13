@@ -68,6 +68,11 @@ class WeatherResponse(BaseModel):
     wind_deg: int
 
     @property
+    def icon_url(self) -> str:
+        """Get OpenWeatherMap icon URL from icon code."""
+        return f"https://openweathermap.org/img/wn/{self.icon}@2x.png"
+
+    @property
     def wind_direction_compass(self) -> str:
         """Convert wind direction degrees to compass arrow."""
         directions = ["↑", "↗", "→", "↘", "↓", "↙", "←", "↖"]
@@ -75,53 +80,17 @@ class WeatherResponse(BaseModel):
         return directions[idx]
 
     @property
-    def weather_emoji(self) -> str:
-        """Get emoji for weather condition."""
-        condition_lower = self.condition.lower()
-        if "clear" in condition_lower:
-            return "☀️"
-        elif "cloud" in condition_lower:
-            return "☁️"
-        elif "rain" in condition_lower or "drizzle" in condition_lower:
-            return "🌧️"
-        elif "thunder" in condition_lower or "storm" in condition_lower:
-            return "⛈️"
-        elif "snow" in condition_lower:
-            return "❄️"
-        elif "mist" in condition_lower or "fog" in condition_lower:
-            return "🌫️"
-        else:
-            return "🌤️"
-
-    @property
     def beaufort_scale(self) -> int:
-        """Get Beaufort scale number from wind speed (m/s)."""
-        if self.wind_speed < 0.5:
-            return 0
-        elif self.wind_speed < 1.6:
-            return 1
-        elif self.wind_speed < 3.4:
-            return 2
-        elif self.wind_speed < 5.5:
-            return 3
-        elif self.wind_speed < 8.0:
-            return 4
-        elif self.wind_speed < 10.8:
-            return 5
-        elif self.wind_speed < 13.9:
-            return 6
-        elif self.wind_speed < 17.2:
-            return 7
-        elif self.wind_speed < 20.8:
-            return 8
-        elif self.wind_speed < 24.5:
-            return 9
-        elif self.wind_speed < 28.5:
-            return 10
-        elif self.wind_speed < 32.7:
-            return 11
-        else:
-            return 12
+        """Get Beaufort scale number from wind speed (m/s).
+
+        Uses binary search for efficient lookup of wind speed thresholds.
+        Beaufort scale ranges from 0 (calm) to 12 (hurricane).
+        """
+        import bisect
+
+        # Beaufort scale thresholds in m/s (lower bounds for each scale)
+        thresholds = [0.5, 1.6, 3.4, 5.5, 8.0, 10.8, 13.9, 17.2, 20.8, 24.5, 28.5, 32.7]
+        return bisect.bisect_right(thresholds, self.wind_speed)
 
     @property
     def beaufort_description(self) -> str:
@@ -157,19 +126,20 @@ class WeatherResponse(BaseModel):
         condition = data.weather[0].main if data.weather else "Unknown"
         icon = data.weather[0].icon if data.weather else ""
 
-        # Generate recommendation based on temperature
-        if temp < 5:
-            recommendation = "Bundle up! It's very cold outside. ❄️"
-        elif temp < 10:
-            recommendation = "Wear a warm jacket. 🧥"
-        elif temp < 15:
-            recommendation = "Light jacket recommended. 🍂"
-        elif temp < 20:
-            recommendation = "Perfect temperature! 😊"
-        elif temp < 25:
-            recommendation = "Nice and warm! ☀️"
-        else:
-            recommendation = "Stay cool and hydrated! 🌡️"
+        # Generate recommendation based on temperature (Celsius)
+        import bisect
+
+        temp_thresholds = [5, 10, 15, 20, 25]
+        recommendations = [
+            "Bundle up! It's very cold outside. ❄️",
+            "Wear a warm jacket. 🧥",
+            "Light jacket recommended. 🍂",
+            "Perfect temperature! 😊",
+            "Nice and warm! ☀️",
+            "Stay cool and hydrated! 🌡️",
+        ]
+        idx = bisect.bisect_right(temp_thresholds, temp)
+        recommendation = recommendations[idx]
 
         return cls(
             temp=temp,

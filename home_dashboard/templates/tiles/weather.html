@@ -7,32 +7,32 @@
     </div>
     {% else %}
 
-    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem;">
+    <div class="weather-grid">
         <!-- Left column: Temperature & Wind -->
         <div>
             <strong>Temperature</strong>
-            <div style="font-size: 2.5rem; font-weight: bold; line-height: 1; margin: 0.5rem 0;">
-                {{ "%.1f"|format(temp) }}°C
+            <div class="weather-metric-large">
+                {{ temp|round(1) }}°C
             </div>
-            <div style="color: var(--text-secondary); margin-bottom: 1.5rem;">
-                Feels like {{ "%.1f"|format(feels_like) }}°C
+            <div class="weather-metric-subtitle">
+                Feels like {{ feels_like|round(1) }}°C
             </div>
 
             <strong>Wind</strong>
-            <div style="font-size: 2.5rem; font-weight: bold; line-height: 1; margin: 0.5rem 0;">
-                {{ beaufort }} <span style="font-size: 2.5rem;">{{ wind_direction }}</span>
+            <div class="weather-metric-large">
+                {{ beaufort }} <span>{{ wind_direction }}</span>
             </div>
-            <div style="color: var(--text-secondary);">
+            <div class="caption">
                 {{ beaufort_description }}
             </div>
         </div>
 
         <!-- Right column: Condition & Recommendation -->
         <div>
-            <div style="margin-bottom: 1rem;">
-                <strong>Condition:</strong> {{ weather_emoji }} {{ condition }}
+            <div class="weather-info-item">
+                <strong>Condition:</strong> <img src="{{ icon_url }}" alt="{{ condition }}" class="weather-icon"> {{ condition }}
             </div>
-            <div style="margin-bottom: 1rem;">
+            <div class="weather-info-item">
                 <strong>Location:</strong> {{ location }}
             </div>
             <div class="message info">

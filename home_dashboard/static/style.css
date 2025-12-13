@@ -1,10 +1,11 @@
-/* Streamlit-inspired styling for home dashboard */
+/* Dark theme styling for home dashboard */
 
 :root {
     --primary-color: #ff4b4b;
     --background-color: #0e1117;
     --secondary-bg: #262730;
     --text-color: #fafafa;
+    --text-secondary: #a3a8b4;
     --text-muted: #a3a8b4;
     --border-color: #3d4148;
     --success-color: #09ab3b;
@@ -86,6 +87,14 @@ h3 {
 .tile h3 {
     margin-bottom: 1rem;
     color: var(--primary-color);
+}
+
+/* Weather icon */
+.weather-icon {
+    width: 32px;
+    height: 32px;
+    vertical-align: middle;
+    margin-right: 0.25rem;
 }
 
 /* Buttons */
@@ -217,17 +226,110 @@ select:focus {
     color: var(--info-color);
 }
 
+/* Tile Loader - Default swap is outerHTML */
+.tile-loader {
+    /* HTMX default behavior, no additional styles needed */
+}
+
+/* Common Button Modifiers */
+.button-full-width {
+    width: 100%;
+}
+
+.button-nowrap {
+    white-space: nowrap;
+}
+
+.button-small {
+    font-size: 0.9rem;
+    padding: 0.4rem 0.8rem;
+}
+
+/* Weather Tile Specific Styles */
+.weather-grid {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 1.5rem;
+}
+
+.weather-metric-large {
+    font-size: 2.5rem;
+    font-weight: bold;
+    line-height: 1;
+    margin: 0.5rem 0;
+}
+
+.weather-metric-subtitle {
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+}
+
+.weather-info-item {
+    margin-bottom: 1rem;
+}
+
+/* Spotify Tile Specific Styles */
+.spotify-auth-note {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-top: 1rem;
+}
+
+.spotify-track-info {
+    margin-bottom: 1.5rem;
+}
+
+.spotify-section {
+    margin-bottom: 1.5rem;
+}
+
+.spotify-playlist-grid {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.spotify-controls {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Status Bar Specific Styles */
+.status-bar {
+    padding: 1rem;
+    background: var(--secondary-bg);
+    border-radius: 8px;
+}
+
+.status-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    align-items: center;
+}
+
+.status-center {
+    text-align: center;
+}
+
+.status-right {
+    text-align: right;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     body {
         padding: 1rem;
     }
 
-    .dashboard-grid {
-        grid-template-columns: 1fr;
-    }
-
     .button-grid {
         grid-template-columns: repeat(2, 1fr);
+    }
+
+    .weather-grid {
+        grid-template-columns: 1fr;
     }
 }

@@ -29,10 +29,3 @@ class DebugInfo(BaseModel):
     state: dict[str, Any] = Field(..., description="Application state")
     config: dict[str, Any] = Field(..., description="Configuration (sanitized)")
     requests: dict[str, int] = Field(..., description="Request statistics")
-
-
-class ErrorResponse(BaseModel):
-    """Error response."""
-
-    detail: str
-    error_code: str

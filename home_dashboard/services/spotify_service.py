@@ -13,7 +13,7 @@ from home_dashboard.exceptions import (
     SpotifyNotAuthenticatedException,
 )
 from home_dashboard.logging_config import get_logger, log_with_context
-from home_dashboard.models import SpotifyStatus
+from home_dashboard.models import SpotifyPlaybackState
 from home_dashboard.services import tv_tizen_service
 from home_dashboard.state_managers import SpotifyAuthManager
 
@@ -165,7 +165,7 @@ async def _get_access_token(
 
 async def get_current_track(
     client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, settings: Settings | None = None
-) -> SpotifyStatus:
+) -> SpotifyPlaybackState:
     """
     Get current playback state on Spotify with caching.
 
@@ -177,7 +177,7 @@ async def get_current_track(
         settings: Settings instance (defaults to singleton)
 
     Returns:
-        SpotifyStatus with current track and playback info (may be cached).
+        SpotifyPlaybackState with current track and playback info (may be cached).
 
     Raises:
         SpotifyAPIException: If API call fails.
@@ -187,7 +187,7 @@ async def get_current_track(
 
     cache_key = "spotify:current_track"
 
-    async def fetch_current_track() -> SpotifyStatus:
+    async def fetch_current_track() -> SpotifyPlaybackState:
         """Fetch fresh playback status from Spotify API."""
         log_with_context(
             logger,
@@ -218,7 +218,7 @@ async def get_current_track(
             item = data.get("item") or {}
             device = data.get("device") or {}
 
-            status = SpotifyStatus(
+            status = SpotifyPlaybackState(
                 is_playing=is_playing,
                 track_name=item.get("name"),
                 artist_name=item.get("artists", [{}])[0].get("name") if item.get("artists") else None,
