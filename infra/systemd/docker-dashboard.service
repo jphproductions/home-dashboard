@@ -6,15 +6,13 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/pi/home-dashboard/docker
-# Use docker compose (modern syntax) with absolute path to compose file
-ExecStart=/usr/bin/docker compose -f /home/pi/home-dashboard/docker/docker-compose.yml up
-ExecStop=/usr/bin/docker compose -f /home/pi/home-dashboard/docker/docker-compose.yml down
+WorkingDirectory=%h/home-dashboard/docker
+ExecStart=/usr/bin/docker compose -f %h/home-dashboard/docker/docker-compose.yml up
+ExecStop=/usr/bin/docker compose -f %h/home-dashboard/docker/docker-compose.yml down
 Restart=on-failure
 RestartSec=10
 User=pi
-# Load environment variables from .env file
-EnvironmentFile=-/home/pi/home-dashboard/.env
+EnvironmentFile=-%h/home-dashboard/.env
 
 [Install]
 WantedBy=multi-user.target
