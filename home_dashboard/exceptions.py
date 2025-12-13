@@ -64,7 +64,7 @@ class DashboardException(Exception):
         self.message = message
         self.code = code
         self.status_code = status_code
-        self.details = details or {}
+        self.details = details
         super().__init__(message)
 
 
@@ -100,7 +100,7 @@ class SpotifyNotAuthenticatedException(SpotifyException):
         super().__init__(
             message,
             code=ErrorCode.SPOTIFY_NOT_AUTHENTICATED,
-            status_code=401,
+            status_code=403,
             details=details,
         )
 

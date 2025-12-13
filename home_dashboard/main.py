@@ -41,8 +41,8 @@ from home_dashboard.security import get_cors_origins, get_trusted_hosts, verify_
 from home_dashboard.services import spotify_service, weather_service
 from home_dashboard.state_managers import SpotifyAuthManager, TVStateManager
 
-# Load environment variables from .env file (must be before other imports that use env vars)
-load_dotenv(Path(__file__).parent.parent / ".env")
+# Load environment variables from .env file
+load_dotenv(Path(__file__).parent / ".env")
 
 # Configure structured logging (JSON to file + console)
 log_level = os.getenv("LOG_LEVEL", "INFO")
@@ -53,10 +53,23 @@ logger = get_logger(__name__)
 warnings.filterwarnings("ignore", message="Unverified HTTPS request")
 
 # Sensitive parameters to redact from URLs
-SENSITIVE_PARAMS = ["appid", "api_key", "token", "password", "secret", "key", "refresh_token", "access_token"]
+SENSITIVE_PARAMS = [
+    "appid",
+    "api_key",
+    "token",
+    "password",
+    "secret",
+    "key",
+    "refresh_token",
+    "access_token",
+    "client_secret",
+    "auth_token",
+    "authorization",
+    "bearer",
+]
 
-# Initialize rate limiter (100 requests per minute per IP)
-limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+# Initialize rate limiter (60 requests per minute per IP)
+limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
 
 
 def redact_sensitive_data(url: str) -> str:
@@ -123,7 +136,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         "response": [log_response],
     }
 
-    # Configure httpx with granular timeouts (per httpx 0.27.2 best practices)
+    # Configure httpx with granular timeouts
     if proxy:
         log_with_context(
             logger,
@@ -205,7 +218,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             error_type=type(e).__name__,
             event_type="app_error",
         )
-        # ✅ CRITICAL: Must re-raise per FastAPI 0.122.0+ to prevent memory leaks!
         raise
     finally:
         # Cleanup always runs, even if exception was raised
@@ -337,7 +349,7 @@ def custom_openapi():
             "type": "http",
             "scheme": "bearer",
             "bearerFormat": "API Key",
-            "description": "Enter your API key (without 'Bearer' prefix)",
+            "description": "Enter your API key",
         }
     }
 
@@ -352,7 +364,7 @@ def custom_openapi():
 
         for method, operation in path_item.items():
             if method in ["get", "post", "put", "delete", "patch"]:
-                # All API endpoints require authentication (weather, spotify, tv, phone, debug)
+                # All API endpoints require authentication
                 if path.startswith("/api/") or path == "/debug":
                     operation["security"] = [{"BearerAuth": []}]
 
@@ -399,19 +411,6 @@ async def health_check():
     For detailed health status, use `/health/ready`.
     """
     return HealthResponse(status="ok", version=__version__)
-
-
-@app.get("/health/live", response_model=HealthResponse)
-async def liveness_check():
-    """Liveness probe - is the application running?
-
-    This endpoint always returns 200 if the app process is alive.
-    Use this for Kubernetes liveness probes or basic uptime monitoring.
-
-    **Returns:**
-    - 200: Application is running
-    """
-    return HealthResponse(status="alive", version=__version__)
 
 
 @app.get("/health/ready", response_model=DetailedHealthResponse)
@@ -563,7 +562,7 @@ async def debug_info(
         "spotify_redirect_uri": settings.spotify_redirect_uri,
         "cors_origins": get_cors_origins(),
         "trusted_hosts": get_trusted_hosts(),
-        "rate_limit_default": "100/minute",
+        "rate_limit_default": "60/minute",
     }
 
     # Request stats
@@ -610,14 +609,7 @@ async def dashboard_exception_handler(request, exc: DashboardException):
         event_type="dashboard_error",
     )
 
-    error_content: dict[str, Any] = {
-        "code": exc.code.value,
-        "message": exc.message,
-    }
-
-    # Include details only if present (avoid empty objects)
-    if exc.details:
-        error_content["details"] = exc.details
+    error_content: dict[str, Any] = {"code": exc.code.value, "message": exc.message, "details": exc.details}
 
     return JSONResponse(
         status_code=exc.status_code,

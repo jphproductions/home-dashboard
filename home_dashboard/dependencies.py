@@ -10,9 +10,6 @@ async def get_http_client(request: Request) -> httpx.AsyncClient:
     """
     Get the shared HTTP client from app state.
 
-    This dependency provides access to the connection-pooled HTTP client
-    initialized during application startup.
-
     Args:
         request: The FastAPI request object.
 
@@ -22,7 +19,7 @@ async def get_http_client(request: Request) -> httpx.AsyncClient:
     Raises:
         RuntimeError: If HTTP client is not initialized.
     """
-    client: httpx.AsyncClient = request.app.state.http_client
+    client: httpx.AsyncClient | None = getattr(request.app.state, "http_client", None)
 
     if client is None:
         raise RuntimeError("HTTP client not initialized. This should never happen.")
@@ -34,9 +31,6 @@ async def get_spotify_auth_manager(request: Request) -> SpotifyAuthManager:
     """
     Get the Spotify authentication manager from app state.
 
-    This dependency provides access to the shared Spotify auth manager
-    initialized during application startup.
-
     Args:
         request: The FastAPI request object.
 
@@ -46,7 +40,7 @@ async def get_spotify_auth_manager(request: Request) -> SpotifyAuthManager:
     Raises:
         RuntimeError: If Spotify auth manager is not initialized.
     """
-    manager: SpotifyAuthManager = request.app.state.spotify_auth_manager
+    manager: SpotifyAuthManager | None = getattr(request.app.state, "spotify_auth_manager", None)
 
     if manager is None:
         raise RuntimeError("Spotify auth manager not initialized.")
@@ -58,9 +52,6 @@ async def get_tv_state_manager(request: Request) -> TVStateManager:
     """
     Get the TV state manager from app state.
 
-    This dependency provides access to the shared TV state manager
-    initialized during application startup.
-
     Args:
         request: The FastAPI request object.
 
@@ -70,7 +61,7 @@ async def get_tv_state_manager(request: Request) -> TVStateManager:
     Raises:
         RuntimeError: If TV state manager is not initialized.
     """
-    manager: TVStateManager = request.app.state.tv_state_manager
+    manager: TVStateManager | None = getattr(request.app.state, "tv_state_manager", None)
 
     if manager is None:
         raise RuntimeError("TV state manager not initialized.")

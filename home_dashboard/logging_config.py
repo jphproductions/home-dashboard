@@ -23,7 +23,7 @@ def setup_logging(log_level: str = "INFO") -> logging.Logger:
         Configured root logger instance
     """
     # Create logs directory if it doesn't exist
-    log_dir = Path("logs")
+    log_dir = Path(__file__).parent.parent / "logs"
     log_dir.mkdir(exist_ok=True)
 
     # Get root logger
@@ -41,7 +41,7 @@ def setup_logging(log_level: str = "INFO") -> logging.Logger:
         encoding="utf-8",
     )
     json_formatter = jsonlogger.JsonFormatter(
-        "%(asctime)s %(name)s %(levelname)s %(message)s %(pathname)s %(lineno)d",
+        "%(asctime)s %(name)s %(levelname)s %(message)s %(filename)s %(lineno)d",
         timestamp=True,
     )
     json_handler.setFormatter(json_formatter)

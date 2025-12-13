@@ -11,6 +11,7 @@ logger = get_logger(__name__)
 
 # HTTP Bearer token scheme
 security = HTTPBearer(auto_error=False)
+api_key = os.getenv("DASHBOARD_API_KEY", "").strip()
 
 
 async def verify_api_key(
@@ -33,13 +34,14 @@ async def verify_api_key(
     Example:
         Authorization: Bearer your-api-key-here
     """
-    api_key = os.getenv("DASHBOARD_API_KEY", "").strip()
 
     # Debug logging
     log_with_context(
         logger,
         "debug",
-        f"API key check: configured={bool(api_key)}, has_credentials={bool(credentials)}",
+        "API key check",
+        configured={bool(api_key)},
+        has_credentials={bool(credentials)},
         event_type="auth_check",
         path=str(request.url),
     )

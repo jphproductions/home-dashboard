@@ -10,7 +10,6 @@ from home_dashboard.logging_config import get_logger, log_with_context
 
 logger = get_logger(__name__)
 
-# Use parent directory (now that structure is flat)
 BASE_DIR = Path(__file__).resolve().parent.parent  # home-dashboard/
 
 
@@ -51,7 +50,7 @@ class Settings(BaseSettings):
     ifttt_event_name: str = Field(min_length=1, description="IFTTT event name")
 
     model_config = SettingsConfigDict(
-        env_file=str(BASE_DIR / ".env"),
+        env_file=Path(BASE_DIR / ".env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -138,17 +137,6 @@ class Settings(BaseSettings):
         """Ensure redirect URI is valid and uses correct port."""
         if not v.startswith(("http://", "https://")):
             raise ValueError("spotify_redirect_uri must be a valid http:// or https:// URL")
-
-        # Warn if using wrong port (8501 is old Streamlit port)
-        if ":8501" in v:
-            log_with_context(
-                logger,
-                "warning",
-                "spotify_redirect_uri uses port 8501 (Streamlit), should be 8000 for FastAPI",
-                redirect_uri=v,
-                event_type="config_spotify_port_mismatch",
-            )
-
         return v
 
 
@@ -175,8 +163,3 @@ def get_settings() -> Settings:
     if _settings_instance is None:
         _settings_instance = Settings()
     return _settings_instance
-
-
-# Legacy global instance for backward compatibility during migration
-# TODO: Remove this after all code uses Depends(get_settings)
-settings = get_settings()

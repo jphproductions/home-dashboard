@@ -135,7 +135,7 @@ async def cached(
     cache: SimpleCache,
     key: str,
     ttl_seconds: int,
-    fetch_func: Callable[[], Awaitable[T] | Any],
+    fetch_func: Callable[[], Awaitable[T]],
 ) -> T:
     """Cached wrapper for async functions.
 
@@ -161,7 +161,7 @@ async def cached(
         cache_key=key,
         event_type="cache_miss",
     )
-    value: T = await fetch_func()
+    value = await fetch_func()
 
     # Store in cache
     await cache.set(key, value, ttl_seconds)

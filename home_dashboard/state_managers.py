@@ -5,6 +5,7 @@ for async operations. All state managers inherit from StateManager ABC.
 """
 
 import asyncio
+import time
 from abc import ABC, abstractmethod
 
 
@@ -41,7 +42,7 @@ class SpotifyAuthManager(StateManager):
 
     async def initialize(self) -> None:
         """Initialize the Spotify auth manager."""
-        # No initialization needed for now
+        # No initialization needed for now, lifecycle method required by ABC
         pass
 
     async def cleanup(self) -> None:
@@ -58,8 +59,6 @@ class SpotifyAuthManager(StateManager):
             Access token string or None if expired/not set
         """
         async with self._lock:
-            import time
-
             if self._access_token and self._token_expires_at > time.time():
                 return self._access_token
             return None
@@ -72,8 +71,6 @@ class SpotifyAuthManager(StateManager):
             expires_in: Expiration time in seconds
         """
         async with self._lock:
-            import time
-
             self._access_token = token
             self._token_expires_at = time.time() + expires_in
 
@@ -92,7 +89,7 @@ class TVStateManager(StateManager):
 
     async def initialize(self) -> None:
         """Initialize the TV state manager."""
-        # No initialization needed for now
+        # No initialization needed for now, lifecycle method required by ABC
         pass
 
     async def cleanup(self) -> None:
