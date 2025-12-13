@@ -42,7 +42,7 @@ from home_dashboard.services import spotify_service, weather_service
 from home_dashboard.state_managers import SpotifyAuthManager, TVStateManager
 
 # Load environment variables from .env file
-load_dotenv(Path(__file__).parent / ".env")
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 # Configure structured logging (JSON to file + console)
 log_level = os.getenv("LOG_LEVEL", "INFO")
@@ -291,7 +291,8 @@ app = FastAPI(
 
 # Add security middleware
 # CORS - restrict to local network
-cors_origins = get_cors_origins()
+settings = get_settings()
+cors_origins = get_cors_origins(settings)
 log_with_context(
     logger,
     "info",
@@ -308,7 +309,7 @@ app.add_middleware(
 )
 
 # Trusted hosts - prevent host header injection
-trusted_hosts = get_trusted_hosts()
+trusted_hosts = get_trusted_hosts(settings)
 log_with_context(
     logger,
     "info",
@@ -560,8 +561,8 @@ async def debug_info(
         "api_port": settings.api_port,
         "weather_location": settings.weather_location,
         "spotify_redirect_uri": settings.spotify_redirect_uri,
-        "cors_origins": get_cors_origins(),
-        "trusted_hosts": get_trusted_hosts(),
+        "cors_origins": get_cors_origins(settings),
+        "trusted_hosts": get_trusted_hosts(settings),
         "rate_limit_default": "60/minute",
     }
 

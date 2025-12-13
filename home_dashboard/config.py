@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     # API server settings - required
     api_host: str = Field(min_length=1, description="API server host (e.g., '0.0.0.0')")
     api_port: int = Field(ge=1, le=65535, default=8000, description="API server port")
+    dashboard_api_key: str = Field(min_length=1, description="API authentication key")
 
     # TV settings - required for TV features
     tv_ip: str = Field(min_length=7, description="Samsung TV IP address (e.g., '192.168.1.100')")
@@ -47,6 +48,14 @@ class Settings(BaseSettings):
 
     # IFTTT - required for phone integration
     ifttt_webhook_key: str = Field(min_length=1, description="IFTTT webhook key")
+
+    # Security settings - CORS and trusted hosts
+    cors_origins: str = Field(
+        default="http://localhost:8000,http://192.168.178.*", description="Comma-separated list of allowed CORS origins"
+    )
+    trusted_hosts: str = Field(
+        default="localhost,127.0.0.1,*.local", description="Comma-separated list of trusted host patterns"
+    )
     ifttt_event_name: str = Field(min_length=1, description="IFTTT event name")
 
     model_config = SettingsConfigDict(

@@ -1,28 +1,28 @@
 """Security middleware and authentication for Home Dashboard."""
 
-import os
-
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from home_dashboard.config import Settings, get_settings
 from home_dashboard.logging_config import get_logger, log_with_context
 
 logger = get_logger(__name__)
 
 # HTTP Bearer token scheme
 security = HTTPBearer(auto_error=False)
-api_key = os.getenv("DASHBOARD_API_KEY", "").strip()
 
 
 async def verify_api_key(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    settings: Settings = Depends(get_settings),
 ) -> None:
     """Verify API key from Authorization header.
 
     Args:
         request: The FastAPI request object
         credentials: HTTP Bearer credentials from header
+        settings: Settings instance with API key from .env
 
     Raises:
         HTTPException: If API key is missing or invalid
@@ -34,6 +34,7 @@ async def verify_api_key(
     Example:
         Authorization: Bearer your-api-key-here
     """
+    api_key = settings.dashboard_api_key
 
     # Debug logging
     log_with_context(
@@ -102,21 +103,25 @@ async def verify_api_key(
     )
 
 
-def get_cors_origins() -> list[str]:
-    """Get allowed CORS origins from environment.
+def get_cors_origins(settings: Settings) -> list[str]:
+    """Get allowed CORS origins from settings.
+
+    Args:
+        settings: Settings instance with CORS configuration
 
     Returns:
         List of allowed origin patterns
     """
-    origins_env = os.getenv("CORS_ORIGINS", "http://localhost:8000,http://192.168.178.*")
-    return [origin.strip() for origin in origins_env.split(",")]
+    return [origin.strip() for origin in settings.cors_origins.split(",")]
 
 
-def get_trusted_hosts() -> list[str]:
-    """Get trusted host patterns from environment.
+def get_trusted_hosts(settings: Settings) -> list[str]:
+    """Get trusted host patterns from settings.
+
+    Args:
+        settings: Settings instance with trusted hosts configuration
 
     Returns:
         List of trusted host patterns
     """
-    hosts_env = os.getenv("TRUSTED_HOSTS", "localhost,127.0.0.1,*.local")
-    return [host.strip() for host in hosts_env.split(",")]
+    return [host.strip() for host in settings.trusted_hosts.split(",")]
