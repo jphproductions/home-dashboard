@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from home_dashboard.config import Settings, get_settings
 from home_dashboard.dependencies import get_http_client
 from home_dashboard.security import verify_api_key
 from home_dashboard.services import phone_ifttt_service
@@ -42,6 +43,7 @@ limiter = Limiter(key_func=get_remote_address)
 async def ring_phone(
     request: Request,
     client: httpx.AsyncClient = Depends(get_http_client),
+    settings: Settings = Depends(get_settings),
     format: Literal["json", "html"] = Query(default="html", description="Response format"),
 ):
     """Trigger IFTTT webhook to ring phone.
@@ -62,7 +64,7 @@ async def ring_phone(
         - Rate limited to prevent abuse
     """
     try:
-        await phone_ifttt_service.ring_phone(client)
+        await phone_ifttt_service.ring_phone(client, settings)
 
         if format == "html":
             return TemplateRenderer.render_phone_tile(request)

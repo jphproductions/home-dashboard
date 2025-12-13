@@ -2,10 +2,9 @@
 
 from typing import Literal
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from home_dashboard.dependencies import get_http_client, get_tv_state_manager
+from home_dashboard.dependencies import get_tv_state_manager
 from home_dashboard.security import verify_api_key
 from home_dashboard.services import tv_tizen_service
 from home_dashboard.state_managers import TVStateManager
@@ -40,7 +39,6 @@ router = APIRouter(dependencies=[Depends(verify_api_key)])
     },
 )
 async def wake_tv(
-    client: httpx.AsyncClient = Depends(get_http_client),
     tv_manager: TVStateManager = Depends(get_tv_state_manager),
     format: Literal["json", "html"] = Query(default="json", description="Response format"),
 ):

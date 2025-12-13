@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from home_dashboard.config import Settings, get_settings
 from home_dashboard.dependencies import get_http_client
 from home_dashboard.security import verify_api_key
 from home_dashboard.services import weather_service
@@ -51,6 +52,7 @@ limiter = Limiter(key_func=get_remote_address)
 async def get_current_weather(
     request: Request,
     client: httpx.AsyncClient = Depends(get_http_client),
+    settings: Settings = Depends(get_settings),
     format: Literal["json", "html"] = Query(default="json", description="Response format"),
 ):
     """Get current weather data.
@@ -65,10 +67,10 @@ async def get_current_weather(
     """
     try:
         if format == "html":
-            return await TemplateRenderer.render_weather_tile(request, client)
+            return await TemplateRenderer.render_weather_tile(request, client, settings)
 
         # JSON response
-        weather = await weather_service.get_current_weather(client)
+        weather = await weather_service.get_current_weather(client, settings)
         return weather
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Weather error: {str(e)}") from e

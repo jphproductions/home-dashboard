@@ -22,8 +22,6 @@ from home_dashboard.state_managers import TVStateManager
 
 logger = get_logger(__name__)
 
-# NOTE: Global state is deprecated - use TVStateManager via dependency injection
-
 # Retry configuration
 MAX_RETRIES = 3
 INITIAL_BACKOFF = 1.0  # seconds
@@ -286,15 +284,15 @@ async def wake(settings: Settings | None = None, tv_manager: TVStateManager | No
                 event_type="tv_wake_failure",
             )
 
-            # Optional: escalate to phone notification after N failures
+            # Log multiple failures for monitoring
             if count >= 5:
                 log_with_context(
                     logger,
                     "error",
-                    "TV wake failed multiple times, consider escalating",
+                    "TV wake failed multiple times",
                     tv_ip=str(settings.tv_ip),
                     failure_count=count,
-                    event_type="tv_wake_critical",
+                    event_type="tv_wake_multiple_failures",
                 )
         else:
             log_with_context(
@@ -311,23 +309,25 @@ async def wake(settings: Settings | None = None, tv_manager: TVStateManager | No
 
 async def get_status(settings: Settings | None = None) -> bool:
     """
-    Get TV power status (experimental).
+    Check if TV is reachable via WebSocket connection.
+
+    Tests TV reachability by attempting WebSocket handshake.
+    If successful, TV is on and accepting connections.
 
     Args:
         settings: Settings instance (defaults to singleton)
 
     Returns:
-        True if TV is on, False if off.
+        True if TV is reachable (on/standby), False if unreachable (off/network issue).
     """
     if settings is None:
         settings = get_settings()
 
     try:
         # Try to connect as a simple reachability test
-        # Note: actual power state detection via Tizen is unreliable
         async with _connect_to_tv(settings) as _:
             # If we successfully connected and got handshake response,
-            # assume TV is reachable (on or standby)
+            # TV is reachable (on or standby)
             return True
 
     except TVConnectionException as e:

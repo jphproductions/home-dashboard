@@ -122,8 +122,10 @@ async def _get_access_token(
             expires_in=expires_in,
         )
 
-        # Note: If Spotify returns a new refresh token, user must update .env manually
-        # This happens rarely, usually on first auth or security events
+        # Note: Spotify may return a new refresh token (rare, on first auth or security events)
+        # Access token: expires in ~1 hour, cached in memory by auth_manager
+        # Refresh token: no expiry, stored in .env (SPOTIFY_REFRESH_TOKEN)
+        # If a new refresh token is returned, user must manually update .env
         if "refresh_token" in data:
             log_with_context(
                 logger,
@@ -292,6 +294,11 @@ async def play(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, sett
 
         response.raise_for_status()
         log_with_context(logger, "info", "Spotify playback started", event_type="spotify_play_success")
+
+        # Invalidate cache to force fresh status on next request
+        cache_key = "spotify:current_track"
+        cache = get_cache()
+        await cache.clear(cache_key)
     except httpx.HTTPError as e:
         status_code = e.response.status_code if hasattr(e, "response") else 502
         response_text = e.response.text if hasattr(e, "response") else None
@@ -342,6 +349,11 @@ async def pause(client: httpx.AsyncClient, auth_manager: SpotifyAuthManager, set
 
         response.raise_for_status()
         log_with_context(logger, "info", "Spotify playback paused", event_type="spotify_pause_success")
+
+        # Invalidate cache to force fresh status on next request
+        cache_key = "spotify:current_track"
+        cache = get_cache()
+        await cache.clear(cache_key)
     except httpx.HTTPError as e:
         status_code = e.response.status_code if hasattr(e, "response") else 502
         response_text = e.response.text if hasattr(e, "response") else None
@@ -374,6 +386,8 @@ async def next_track(
     if settings is None:
         settings = get_settings()
 
+    log_with_context(logger, "info", "Skipping to next track", event_type="spotify_next")
+
     try:
         token = await _get_access_token(client, auth_manager, settings)
         response = await client.post(
@@ -381,9 +395,34 @@ async def next_track(
             headers={"Authorization": f"Bearer {token}"},
             timeout=10.0,
         )
+
+        log_with_context(
+            logger,
+            "debug",
+            "Spotify next track response",
+            event_type="spotify_next_response",
+            status_code=response.status_code,
+        )
+
         response.raise_for_status()
+        log_with_context(logger, "info", "Skipped to next track", event_type="spotify_next_success")
+
+        # Invalidate cache to force fresh status on next request
+        cache_key = "spotify:current_track"
+        cache = get_cache()
+        await cache.clear(cache_key)
     except httpx.HTTPError as e:
         status_code = e.response.status_code if hasattr(e, "response") else 502
+        response_text = e.response.text if hasattr(e, "response") else None
+        log_with_context(
+            logger,
+            "error",
+            "Failed to skip to next track",
+            event_type="spotify_next_error",
+            status_code=status_code,
+            error=str(e),
+            response_body=response_text,
+        )
         raise SpotifyAPIException(
             f"Failed to skip to next track: {str(e)}",
             status_code=status_code,
@@ -404,6 +443,8 @@ async def previous_track(
     if settings is None:
         settings = get_settings()
 
+    log_with_context(logger, "info", "Going to previous track", event_type="spotify_previous")
+
     try:
         token = await _get_access_token(client, auth_manager, settings)
         response = await client.post(
@@ -411,9 +452,34 @@ async def previous_track(
             headers={"Authorization": f"Bearer {token}"},
             timeout=10.0,
         )
+
+        log_with_context(
+            logger,
+            "debug",
+            "Spotify previous track response",
+            event_type="spotify_previous_response",
+            status_code=response.status_code,
+        )
+
         response.raise_for_status()
+        log_with_context(logger, "info", "Went to previous track", event_type="spotify_previous_success")
+
+        # Invalidate cache to force fresh status on next request
+        cache_key = "spotify:current_track"
+        cache = get_cache()
+        await cache.clear(cache_key)
     except httpx.HTTPError as e:
         status_code = e.response.status_code if hasattr(e, "response") else 502
+        response_text = e.response.text if hasattr(e, "response") else None
+        log_with_context(
+            logger,
+            "error",
+            "Failed to go to previous track",
+            event_type="spotify_previous_error",
+            status_code=status_code,
+            error=str(e),
+            response_body=response_text,
+        )
         raise SpotifyAPIException(
             f"Failed to skip to previous track: {str(e)}",
             status_code=status_code,

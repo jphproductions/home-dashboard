@@ -6,13 +6,12 @@ from home_dashboard.config import Settings, get_settings
 from home_dashboard.exceptions import IFTTTException, PhoneException
 
 
-async def ring_phone(client: httpx.AsyncClient, message: str | None = None, settings: Settings | None = None) -> str:
+async def ring_phone(client: httpx.AsyncClient, settings: Settings | None = None) -> str:
     """
-    Trigger IFTTT webhook to ring Jamie's phone.
+    Trigger IFTTT webhook to ring phone.
 
     Args:
         client: Shared HTTP client from dependency injection.
-        message: Optional custom message (not used for basic ring, but for logging).
         settings: Settings instance (defaults to singleton)
 
     Returns:
@@ -28,11 +27,11 @@ async def ring_phone(client: httpx.AsyncClient, message: str | None = None, sett
     try:
         response = await client.post(
             webhook_url,
-            json={"value1": message or "Ring from home dashboard"},
+            json={"value1": "Ring from home dashboard"},
             timeout=10.0,
         )
         response.raise_for_status()
-        return "Ring request sent to Jamie's phone"
+        return "Ring request sent successfully"
     except httpx.HTTPError as e:
         status_code = e.response.status_code if hasattr(e, "response") else 502
         raise IFTTTException(

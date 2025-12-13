@@ -2,6 +2,7 @@
 
 import asyncio
 import secrets
+import time
 from typing import Literal
 from urllib.parse import urlencode
 
@@ -21,8 +22,22 @@ from home_dashboard.views.template_renderer import TemplateRenderer
 router = APIRouter(dependencies=[Depends(verify_api_key)])
 limiter = Limiter(key_func=get_remote_address)
 
-# Store state for OAuth flow (in production, use Redis or database)
-_oauth_states = {}
+# OAuth state storage with TTL cleanup
+# States expire after 10 minutes to prevent memory leaks from abandoned auth flows
+# In production with multiple instances, use Redis or database
+_oauth_states: dict[str, float] = {}  # state -> timestamp
+OAUTH_STATE_TTL_SECONDS = 600  # 10 minutes
+
+
+def _cleanup_expired_oauth_states() -> None:
+    """Remove expired OAuth states to prevent memory leaks."""
+    current_time = time.time()
+    expired_states = [
+        state for state, timestamp in _oauth_states.items() if current_time - timestamp > OAUTH_STATE_TTL_SECONDS
+    ]
+    for state in expired_states:
+        _oauth_states.pop(state, None)
+
 
 # Spotify OAuth scopes needed for playback control
 SPOTIFY_SCOPES = [
@@ -70,6 +85,7 @@ async def get_spotify_status(
     request: Request,
     client: httpx.AsyncClient = Depends(get_http_client),
     auth_manager: SpotifyAuthManager = Depends(get_spotify_auth_manager),
+    settings: Settings = Depends(get_settings),
     format: Literal["json", "html"] = Query(default="json", description="Response format"),
 ):
     """Get current Spotify playback status.
@@ -85,10 +101,10 @@ async def get_spotify_status(
     """
     try:
         if format == "html":
-            return await TemplateRenderer.render_spotify_tile(request, client, auth_manager)
+            return await TemplateRenderer.render_spotify_tile(request, client, auth_manager, settings)
 
         # JSON response
-        status = await spotify_service.get_current_track(client, auth_manager)
+        status = await spotify_service.get_current_track(client, auth_manager, settings)
         return status
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Spotify error: {str(e)}") from e
@@ -118,6 +134,7 @@ async def play(
     request: Request,
     client: httpx.AsyncClient = Depends(get_http_client),
     auth_manager: SpotifyAuthManager = Depends(get_spotify_auth_manager),
+    settings: Settings = Depends(get_settings),
     format: Literal["json", "html"] = Query(default="html", description="Response format"),
 ):
     """Resume playback.
@@ -132,11 +149,11 @@ async def play(
         JSON with status or HTML tile fragment
     """
     try:
-        await spotify_service.play(client, auth_manager)
+        await spotify_service.play(client, auth_manager, settings)
         await asyncio.sleep(0.5)  # Wait for Spotify API to update state
 
         if format == "html":
-            return await TemplateRenderer.render_spotify_tile(request, client, auth_manager)
+            return await TemplateRenderer.render_spotify_tile(request, client, auth_manager, settings)
 
         return {"status": "playing"}
     except Exception as e:
@@ -160,6 +177,7 @@ async def pause(
     request: Request,
     client: httpx.AsyncClient = Depends(get_http_client),
     auth_manager: SpotifyAuthManager = Depends(get_spotify_auth_manager),
+    settings: Settings = Depends(get_settings),
     format: Literal["json", "html"] = Query(default="html", description="Response format"),
 ):
     """Pause playback.
@@ -174,11 +192,11 @@ async def pause(
         JSON with status or HTML tile fragment
     """
     try:
-        await spotify_service.pause(client, auth_manager)
+        await spotify_service.pause(client, auth_manager, settings)
         await asyncio.sleep(0.5)  # Wait for Spotify API to update state
 
         if format == "html":
-            return await TemplateRenderer.render_spotify_tile(request, client, auth_manager)
+            return await TemplateRenderer.render_spotify_tile(request, client, auth_manager, settings)
 
         return {"status": "paused"}
     except Exception as e:
@@ -190,8 +208,8 @@ async def next_track(
     request: Request,
     client: httpx.AsyncClient = Depends(get_http_client),
     auth_manager: SpotifyAuthManager = Depends(get_spotify_auth_manager),
-    format: Literal["json", "html"] = Query(default="html", description="Response format"),
     settings: Settings = Depends(get_settings),
+    format: Literal["json", "html"] = Query(default="html", description="Response format"),
 ):
     """Skip to next track.
 
@@ -205,11 +223,11 @@ async def next_track(
         JSON with status or HTML tile fragment
     """
     try:
-        await spotify_service.next_track(client, auth_manager)
+        await spotify_service.next_track(client, auth_manager, settings)
         await asyncio.sleep(0.5)  # Wait for Spotify API to update state
 
         if format == "html":
-            return await TemplateRenderer.render_spotify_tile(request, client, auth_manager)
+            return await TemplateRenderer.render_spotify_tile(request, client, auth_manager, settings)
 
         return {"status": "next_track"}
     except Exception as e:
@@ -221,8 +239,8 @@ async def previous_track(
     request: Request,
     client: httpx.AsyncClient = Depends(get_http_client),
     auth_manager: SpotifyAuthManager = Depends(get_spotify_auth_manager),
-    format: Literal["json", "html"] = Query(default="html", description="Response format"),
     settings: Settings = Depends(get_settings),
+    format: Literal["json", "html"] = Query(default="html", description="Response format"),
 ):
     """Go to previous track.
 
@@ -236,11 +254,11 @@ async def previous_track(
         JSON with status or HTML tile fragment
     """
     try:
-        await spotify_service.previous_track(client, auth_manager)
+        await spotify_service.previous_track(client, auth_manager, settings)
         await asyncio.sleep(0.5)  # Wait for Spotify API to update state
 
         if format == "html":
-            return await TemplateRenderer.render_spotify_tile(request, client, auth_manager)
+            return await TemplateRenderer.render_spotify_tile(request, client, auth_manager, settings)
 
         return {"status": "previous_track"}
     except Exception as e:
@@ -253,6 +271,7 @@ async def wake_tv_and_play(
     client: httpx.AsyncClient = Depends(get_http_client),
     auth_manager: SpotifyAuthManager = Depends(get_spotify_auth_manager),
     tv_manager: TVStateManager = Depends(get_tv_state_manager),
+    settings: Settings = Depends(get_settings),
     format: Literal["json", "html"] = Query(default="html", description="Response format"),
 ):
     """Wake TV and transfer Spotify playback to TV.
@@ -268,10 +287,10 @@ async def wake_tv_and_play(
         JSON with status or HTML tile fragment
     """
     try:
-        await spotify_service.wake_tv_and_play(client, auth_manager, tv_manager)
+        await spotify_service.wake_tv_and_play(client, auth_manager, tv_manager, settings)
 
         if format == "html":
-            return await TemplateRenderer.render_spotify_tile(request, client, auth_manager)
+            return await TemplateRenderer.render_spotify_tile(request, client, auth_manager, settings)
 
         return {"status": "wake_and_play"}
     except Exception as e:
@@ -306,6 +325,7 @@ async def play_playlist_from_form(
     request: Request,
     client: httpx.AsyncClient = Depends(get_http_client),
     auth_manager: SpotifyAuthManager = Depends(get_spotify_auth_manager),
+    settings: Settings = Depends(get_settings),
 ):
     """Start playing a playlist (from form data) and return updated tile HTML.
 
@@ -327,10 +347,10 @@ async def play_playlist_from_form(
             raise HTTPException(status_code=400, detail="No playlist selected")
 
         # Start playing playlist
-        await spotify_service.play_playlist(client, playlist_uri_value, auth_manager)
+        await spotify_service.play_playlist(client, playlist_uri_value, auth_manager, settings)
 
         # Return updated tile
-        return await TemplateRenderer.render_spotify_tile(request, client, auth_manager)
+        return await TemplateRenderer.render_spotify_tile(request, client, auth_manager, settings)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Play playlist error: {str(e)}") from e
 
@@ -359,9 +379,12 @@ async def auth_status(
 @router.get("/auth/login")
 async def auth_login(settings: Settings = Depends(get_settings)):
     """Initiate Spotify OAuth flow."""
-    # Generate random state for CSRF protection
+    # Clean up expired states before adding new one
+    _cleanup_expired_oauth_states()
+
+    # Generate random state for CSRF protection with timestamp
     state = secrets.token_urlsafe(32)
-    _oauth_states[state] = True
+    _oauth_states[state] = time.time()
 
     # Build Spotify authorization URL
     params = {
