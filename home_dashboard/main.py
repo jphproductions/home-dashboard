@@ -158,7 +158,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 keepalive_expiry=30.0,  # How long to keep idle connections
             ),
             follow_redirects=True,
-            proxies=proxy,
+            proxy=proxy,  # httpx 0.28+ uses 'proxy' (singular) instead of 'proxies'
             verify=False,  # Disable SSL verification for corporate proxy  # nosec B501
             event_hooks=event_hooks,
         )
@@ -292,17 +292,17 @@ app = FastAPI(
 # Add security middleware
 # CORS - restrict to local network
 settings = get_settings()
-cors_origins = get_cors_origins(settings)
+# CORS configuration using regex pattern (wildcards don't work in allow_origins)
 log_with_context(
     logger,
     "info",
-    "Configuring CORS middleware",
+    "Configuring CORS middleware with regex pattern",
     event_type="security_config",
-    origins=cors_origins,
+    pattern="http://(localhost|127\\.0\\.0\\.1|192\\.168\\.178\\.\\d+):8000",
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1|192\.168\.178\.\d+):8000",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

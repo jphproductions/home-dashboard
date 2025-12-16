@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "home-dashboard"
-version = "0.3.0"
+version = "0.4.0"
 description = "Home Dashboard"
 authors = ["Jelle Hilbrands <jelle.hilbrands@outlook.com>"]
 include = ["home_dashboard/py.typed"]
@@ -8,16 +8,16 @@ include = ["home_dashboard/py.typed"]
 [tool.poetry.dependencies]
 python = "^3.12"
 anyio = "^4.0"
-fastapi = "^0.122.1"
-uvicorn = {version = "^0.32.0", extras = ["standard"]}
-httpx = "^0.27.0"
-websockets = "^12.0"
+fastapi = "^0.124.4"
+uvicorn = "^0.38.0"
+httpx = "^0.28.1"
+websockets = "^15.0.1"
 pydantic = "^2.10"
 pydantic-settings = "^2.7"
 jinja2 = "^3.1.0"
-python-multipart = "^0.0.9"
+python-multipart = "^0.0.20"
 slowapi = "^0.1.9"
-python-json-logger = "^3.2.1"
+python-json-logger = "^4.0.0"
 python-dotenv = "^1.2.1"
 
 [tool.poetry.group.dev.dependencies]
@@ -31,7 +31,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 line-length = 120
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = [

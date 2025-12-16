@@ -53,7 +53,7 @@ ENV PATH="/code/.venv/bin:$PATH" \
 EXPOSE 8000
 
 # Health check using curl
-HEALTHCHECK --interval=300s --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run FastAPI with Uvicorn
