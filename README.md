@@ -68,24 +68,35 @@ Controls TV (Tizen), Spotify, weather, and phone notifications.
 
 ## Raspberry Pi Deployment
 
-### First Boot Setup
+### Quick Setup (Automated)
 
-1. Flash Raspberry Pi OS 64-bit to microSD
-2. Enable SSH and Docker
-3. Clone repo to Pi
-4. Fill `.env` with real values (TV IP, API keys)
-5. Run Docker:
+Run the automated setup script on your Pi:
 
-   ```bash
-   docker compose up -d
-   ```
+```bash
+curl -fsSL https://raw.githubusercontent.com/jphproductions/home-dashboard/main/scripts/pi-setup.sh -o pi-setup.sh
+chmod +x pi-setup.sh
+./pi-setup.sh
+```
 
-6. Chromium kiosk will auto-start and display the dashboard
+The script will guide you through configuration and handle all installation steps.
+
+### Manual Setup
+
+For detailed step-by-step instructions, see the comprehensive setup guide:
+
+📖 **[Raspberry Pi Setup Guide](docs/RASPBERRY_PI_SETUP.md)**
+
+Includes:
+- Prerequisites and hardware requirements
+- Quick setup (automated script)
+- Manual setup (step-by-step)
+- Troubleshooting guide
+- Maintenance tips
 
 ### Systemd Services
 
 - `kiosk-chromium.service`: Starts Chromium in kiosk mode at boot
-- `docker-dashboard.service`: Manages Docker container lifecycle (optional)
+- `docker-dashboard.service`: Manages Docker container lifecycle
 
 See [infra/systemd/](infra/systemd/) for configuration.
 

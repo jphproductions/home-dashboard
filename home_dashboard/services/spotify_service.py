@@ -14,7 +14,7 @@ from home_dashboard.exceptions import (
 )
 from home_dashboard.logging_config import get_logger, log_with_context
 from home_dashboard.models import SpotifyPlaybackState
-from home_dashboard.services import tv_tizen_service
+from home_dashboard.protocols import TVServiceProtocol
 from home_dashboard.state_managers import SpotifyAuthManager
 
 if TYPE_CHECKING:
@@ -490,6 +490,7 @@ async def previous_track(
 async def wake_tv_and_play(
     client: httpx.AsyncClient,
     auth_manager: SpotifyAuthManager,
+    tv_service: TVServiceProtocol,
     tv_manager: "TVStateManager",
     settings: Settings | None = None,
 ) -> str:
@@ -503,6 +504,7 @@ async def wake_tv_and_play(
     Args:
         client: Shared HTTP client from dependency injection.
         auth_manager: Spotify authentication state manager
+        tv_service: TV service for waking the TV (injected)
         tv_manager: TV state manager (for failure tracking)
         settings: Settings instance (defaults to singleton)
 
@@ -516,8 +518,8 @@ async def wake_tv_and_play(
         settings = get_settings()
 
     try:
-        # Wake TV first
-        await tv_tizen_service.wake(settings, tv_manager)
+        # Wake TV first using injected service
+        await tv_service.wake(settings, tv_manager)
 
         # Transfer playback to TV device
         token = await _get_access_token(client, auth_manager, settings)

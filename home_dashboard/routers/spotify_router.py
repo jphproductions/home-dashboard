@@ -14,8 +14,9 @@ from slowapi.util import get_remote_address
 
 from home_dashboard.config import Settings, get_settings
 from home_dashboard.dependencies import get_http_client, get_spotify_auth_manager, get_tv_state_manager
+from home_dashboard.protocols import TVServiceProtocol
 from home_dashboard.security import verify_api_key
-from home_dashboard.services import spotify_service
+from home_dashboard.services import spotify_service, tv_tizen_service
 from home_dashboard.state_managers import SpotifyAuthManager, TVStateManager
 from home_dashboard.views.template_renderer import TemplateRenderer
 
@@ -27,6 +28,15 @@ limiter = Limiter(key_func=get_remote_address)
 # In production with multiple instances, use Redis or database
 _oauth_states: dict[str, float] = {}  # state -> timestamp
 OAUTH_STATE_TTL_SECONDS = 600  # 10 minutes
+
+
+def get_tv_service() -> TVServiceProtocol:
+    """Dependency to provide TV service implementation.
+
+    Returns:
+        TV service implementation (tv_tizen_service module)
+    """
+    return tv_tizen_service
 
 
 def _cleanup_expired_oauth_states() -> None:
@@ -270,6 +280,7 @@ async def wake_tv_and_play(
     request: Request,
     client: httpx.AsyncClient = Depends(get_http_client),
     auth_manager: SpotifyAuthManager = Depends(get_spotify_auth_manager),
+    tv_service: TVServiceProtocol = Depends(get_tv_service),
     tv_manager: TVStateManager = Depends(get_tv_state_manager),
     settings: Settings = Depends(get_settings),
     format: Literal["json", "html"] = Query(default="html", description="Response format"),
@@ -280,6 +291,7 @@ async def wake_tv_and_play(
         request: FastAPI request object
         client: HTTP client from dependency injection
         auth_manager: Spotify auth manager from dependency injection
+        tv_service: TV service from dependency injection
         tv_manager: TV state manager from dependency injection
         format: Response format - 'json' for API, 'html' for HTMX
 
@@ -287,7 +299,7 @@ async def wake_tv_and_play(
         JSON with status or HTML tile fragment
     """
     try:
-        await spotify_service.wake_tv_and_play(client, auth_manager, tv_manager, settings)
+        await spotify_service.wake_tv_and_play(client, auth_manager, tv_service, tv_manager, settings)
 
         if format == "html":
             return await TemplateRenderer.render_spotify_tile(request, client, auth_manager, settings)
