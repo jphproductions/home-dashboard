@@ -33,18 +33,18 @@ repos:
       # Run the formatter
       - id: ruff-format
 
-  # Type checking with mypy (LIMITED TO SOURCE CODE ONLY)
-  # - repo: https://github.com/pre-commit/mirrors-mypy
-  #   rev: v1.13.0
-  #   hooks:
-  #     - id: mypy
-  #       files: '^home_dashboard/'
-  #       additional_dependencies:
-  #         - types-requests
-  #         - pydantic
-  #       args: [--no-error-summary]
+  # Type checking with mypy (LIMITED TO PYTHON PACKAGE CODE ONLY)
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        files: '^home_dashboard/'
+        additional_dependencies:
+          - types-requests
+          - pydantic
+        args: [--no-error-summary]
 
-  # Security checks (LIMITED TO SOURCE CODE ONLY)
+  # Security checks (LIMITED TO PYTHON PACKAGE CODE ONLY)
   - repo: https://github.com/PyCQA/bandit
     rev: 1.7.10
     hooks:
