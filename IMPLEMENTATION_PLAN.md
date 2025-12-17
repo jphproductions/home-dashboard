@@ -11,6 +11,7 @@
 This plan addresses **critical and high-value recommendations** from the technical review while avoiding over-engineering. Total estimated time: **8-12 hours** spread across 6 phases.
 
 ### ✅ What We're Implementing
+
 - Docker stability & resource management
 - Security improvements
 - Code maintainability (refactor main.py)
@@ -20,6 +21,7 @@ This plan addresses **critical and high-value recommendations** from the technic
 - Dependency updates
 
 ### ❌ What We're Skipping (Over-Engineering for Home Use)
+
 - Domain layers / hexagonal architecture
 - Comprehensive test suite (0% → 70%)
 - SQLite persistence for state
@@ -39,6 +41,7 @@ This plan addresses **critical and high-value recommendations** from the technic
 ### Docker/Deployment Improvements
 
 #### ✅ Add Resource Limits (2 min)
+
 **Expert:** Linus (Section 2.1)
 **Issue:** No memory/CPU limits → OOM killer risk on Raspberry Pi
 
@@ -58,6 +61,7 @@ services:
 ```
 
 #### ✅ Enable Log Rotation (2 min)
+
 **Expert:** Linus (Section 2.2)
 **Issue:** Unbounded logs → SD card write amplification → premature failure
 
@@ -75,6 +79,7 @@ services:
 ```
 
 #### ✅ Fix Healthcheck Interval (1 min)
+
 **Expert:** Linus (Section 2.3)
 **Issue:** 5-minute interval → slow failure detection
 
@@ -92,10 +97,12 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 ### Security Improvements
 
 #### ✅ Generate Strong API Key (30 sec)
+
 **Expert:** Jurgen (Section 3.1)
 **Issue:** Weak API key → brute force risk
 
 **Commands:**
+
 ```bash
 # Generate new key
 openssl rand -hex 32
@@ -105,6 +112,7 @@ DASHBOARD_API_KEY=<generated-key-here>
 ```
 
 #### ✅ Fix CORS Wildcard (3 min)
+
 **Expert:** Jurgen (Section 3.3)
 **Issue:** FastAPI doesn't support `192.168.178.*` wildcards
 
@@ -131,10 +139,12 @@ app.add_middleware(
 ### Dependency Updates
 
 #### ✅ Update Outdated Packages (30 min)
+
 **Expert:** Review Section "Dependency Updates"
 **Issue:** Outdated packages → missing security fixes & features
 
 **Commands:**
+
 ```bash
 # Check outdated packages
 poetry show --outdated
@@ -158,6 +168,7 @@ poetry run mypy .
 ```
 
 **Expected Updates:**
+
 - fastapi: 0.122.1 → 0.124.4
 - uvicorn: 0.32.1 → 0.38.0
 - websockets: 12.0 → 15.0.1
@@ -199,6 +210,7 @@ home_dashboard/
 ### Implementation Steps
 
 #### Step 1: Create Directory Structure (5 min)
+
 ```bash
 mkdir home_dashboard/core
 mkdir home_dashboard/middleware
@@ -213,42 +225,52 @@ touch home_dashboard/routers/health_router.py
 ```
 
 #### Step 2: Extract Lifespan Management (30 min)
+
 **File:** `home_dashboard/core/lifespan.py`
 
 Extract lines 110-230 from main.py:
+
 - Startup logic (cache, http_client, state managers)
 - Shutdown logic (cleanup)
 - Move utility functions (url_redaction, should_redact_url)
 
 #### Step 3: Extract Middleware Configuration (30 min)
+
 **File:** `home_dashboard/core/middleware.py`
 
 Extract lines 240-280 from main.py:
+
 - CORS configuration
 - TrustedHost middleware
 - Rate limiter setup
 - Request counting middleware
 
 #### Step 4: Extract Exception Handlers (20 min)
+
 **File:** `home_dashboard/middleware/error_handlers.py`
 
 Extract lines 501-600 from main.py:
+
 - DashboardException handler
 - HTTPException handler
 - General exception handler
 - Rate limit handler
 
 #### Step 5: Extract Request/Response Logging (20 min)
+
 **File:** `home_dashboard/middleware/logging_middleware.py`
 
 Extract lines 76-108 from main.py:
+
 - Request logging middleware
 - Response logging middleware
 
 #### Step 6: Extract Health/Debug Endpoints (30 min)
+
 **File:** `home_dashboard/routers/health_router.py`
 
 Extract lines 300-500 from main.py:
+
 - `/health` endpoint
 - `/debug` endpoint
 - HealthResponse, DetailedHealthResponse, DebugInfo models
@@ -256,6 +278,7 @@ Extract lines 300-500 from main.py:
 Move models to `home_dashboard/models/api/` or keep with router.
 
 #### Step 7: Create App Factory (30 min)
+
 **File:** `home_dashboard/core/app_factory.py`
 
 ```python
@@ -289,6 +312,7 @@ def create_app() -> FastAPI:
 ```
 
 #### Step 8: Simplify main.py (10 min)
+
 **File:** `home_dashboard/main.py`
 
 ```python
@@ -313,6 +337,7 @@ if __name__ == "__main__":
 ```
 
 #### Step 9: Test Everything (20 min)
+
 ```bash
 # Run application
 poetry run python -m home_dashboard.main
@@ -343,6 +368,7 @@ poetry run mypy .
 ### Current Problem
 
 **File:** `home_dashboard/services/spotify_service.py`
+
 ```python
 from home_dashboard.services import tv_tizen_service  # BAD: Direct import
 
@@ -353,6 +379,7 @@ async def wake_tv_and_play(...):
 ### Solution: Dependency Injection
 
 #### Step 1: Create Service Protocol (15 min)
+
 **File:** `home_dashboard/services/__init__.py` or `home_dashboard/protocols.py`
 
 ```python
@@ -372,6 +399,7 @@ class TVServiceProtocol(Protocol):
 ```
 
 #### Step 2: Update spotify_service.py (30 min)
+
 **File:** `home_dashboard/services/spotify_service.py`
 
 ```python
@@ -396,6 +424,7 @@ async def wake_tv_and_play(
 ```
 
 #### Step 3: Update spotify_router.py (30 min)
+
 **File:** `home_dashboard/routers/spotify_router.py`
 
 ```python
@@ -428,6 +457,7 @@ async def wake_and_play_endpoint(
 ```
 
 #### Step 4: Test Wake-and-Play (15 min)
+
 ```bash
 # Start app
 poetry run python -m home_dashboard.main
@@ -455,6 +485,7 @@ curl -X POST http://localhost:8000/api/spotify/wake-and-play \
 **Issue:** Everything is `<div>` → poor structure, harder to maintain
 
 #### Update base.html
+
 **File:** `home_dashboard/templates/base.html`
 
 ```html
@@ -480,6 +511,7 @@ curl -X POST http://localhost:8000/api/spotify/wake-and-play \
 ```
 
 #### Update index.html
+
 **File:** `home_dashboard/templates/index.html`
 
 ```html
@@ -649,6 +681,7 @@ curl -X POST http://localhost:8000/api/spotify/wake-and-play \
 **Issue:** No feedback during API calls → looks frozen
 
 #### Add Loading Spinner CSS
+
 **File:** `home_dashboard/static/style.css`
 
 ```css
@@ -683,6 +716,7 @@ button.htmx-request {
 ```
 
 #### Add Spinner to Buttons
+
 **File:** `home_dashboard/templates/tiles/spotify.html`
 
 ```html
@@ -705,6 +739,7 @@ button.htmx-request {
 ```
 
 #### Add Error Handling
+
 **File:** `home_dashboard/templates/base.html`
 
 ```html
@@ -737,6 +772,7 @@ button.htmx-request {
 ### Implementation
 
 #### Step 1: Create .env Update Utility (30 min)
+
 **File:** `home_dashboard/utils/env_updater.py` (new file)
 
 ```python
@@ -797,6 +833,7 @@ def get_env_path() -> Path:
 ```
 
 #### Step 2: Update Spotify OAuth Callback (30 min)
+
 **File:** `home_dashboard/routers/spotify_router.py`
 
 ```python
@@ -902,12 +939,14 @@ async def auth_callback(
 ```
 
 #### Step 3: Create utils Directory (if needed)
+
 ```bash
 mkdir -p home_dashboard/utils
 touch home_dashboard/utils/__init__.py
 ```
 
 #### Step 4: Test OAuth Flow (30 min)
+
 ```bash
 # Start app
 poetry run python -m home_dashboard.main
@@ -939,6 +978,7 @@ cat .env | grep SPOTIFY_REFRESH_TOKEN
 ### Remove Proxy Code
 
 #### Step 1: Remove SSL Verification Bypass
+
 **File:** `home_dashboard/main.py` (or `dependencies.py`)
 
 ```python
@@ -966,6 +1006,7 @@ client = httpx.AsyncClient(
 ```
 
 #### Step 2: Remove Proxy Environment Variables
+
 **File:** `.env`
 
 ```bash
@@ -975,6 +1016,7 @@ client = httpx.AsyncClient(
 ```
 
 #### Step 3: Test External API Calls
+
 ```bash
 # Test Spotify
 curl -X GET http://localhost:8000/api/spotify/status
@@ -989,7 +1031,9 @@ curl -X POST http://localhost:8000/api/phone/ring
 ### Raspberry Pi Deployment
 
 #### Step 1: Set .env Permissions
+
 **Command (on Raspberry Pi):**
+
 ```bash
 chmod 600 /path/to/home-dashboard/.env
 chown hilbrands:hilbrands /path/to/home-dashboard/.env
@@ -1000,6 +1044,7 @@ ls -la .env
 ```
 
 #### Step 2: Verify Docker Compose Changes
+
 ```bash
 # Pull latest image
 docker-compose pull
@@ -1020,7 +1065,8 @@ docker stats
 
 ## ✅ SUCCESS CRITERIA
 
-### Phase 1 Complete When:
+### Phase 1 Complete When
+
 - [ ] Docker container has memory limit (512M)
 - [ ] Log rotation enabled (max 30MB)
 - [ ] Healthcheck runs every 30s
@@ -1029,7 +1075,8 @@ docker stats
 - [ ] All dependencies updated
 - [ ] App starts without errors
 
-### Phase 2 Complete When:
+### Phase 2 Complete When
+
 - [ ] `main.py` is < 50 lines
 - [ ] `core/` directory exists with 3 files
 - [ ] `middleware/` directory exists with 2 files
@@ -1039,14 +1086,16 @@ docker stats
 - [ ] No import errors
 - [ ] Linters pass (ruff, mypy)
 
-### Phase 3 Complete When:
+### Phase 3 Complete When
+
 - [ ] `TVServiceProtocol` defined
 - [ ] `spotify_service.py` doesn't import `tv_tizen_service`
 - [ ] `spotify_router.py` injects TV service
 - [ ] "Wake TV & Play" button works
 - [ ] TV wakes and Spotify starts
 
-### Phase 4 Complete When:
+### Phase 4 Complete When
+
 - [ ] Dashboard uses `<main>`, `<article>`, `<header>`, `<footer>`
 - [ ] All tiles have `aria-labelledby`
 - [ ] Buttons use `hx-swap="innerHTML"` where appropriate
@@ -1054,7 +1103,8 @@ docker stats
 - [ ] Error messages show when API fails
 - [ ] No visual regressions
 
-### Phase 5 Complete When:
+### Phase 5 Complete When
+
 - [ ] `utils/env_updater.py` created
 - [ ] OAuth callback auto-saves token
 - [ ] Token appears in `.env` after auth
@@ -1062,7 +1112,8 @@ docker stats
 - [ ] Restart loads token correctly
 - [ ] Spotify works after restart
 
-### Phase 6 Complete When:
+### Phase 6 Complete When
+
 - [ ] `verify=False` removed from code
 - [ ] Proxy environment variables removed
 - [ ] All external APIs work (Spotify, Weather, IFTTT)
@@ -1082,7 +1133,8 @@ docker stats
 | Phase 5: Auto-save Token | ⏳ Not Started | | | |
 | Phase 6: Final Cleanup | ⏳ Not Started | | | |
 
-### Legend:
+### Legend
+
 - ⏳ Not Started
 - 🔄 In Progress
 - ✅ Complete
@@ -1094,11 +1146,13 @@ docker stats
 ## 🎓 CROSS-REFERENCE TO REVIEW
 
 ### Sarah (Project Structure & Maintainability)
+
 - [x] Section 1.1: 642-Line main.py → **Phase 2**
 - [ ] Section 1.2: Missing Directories → **Skipped** (over-engineering)
 - [ ] Section 1.3: In-Memory State → **Skipped** (tolerable for home use)
 
 ### Linus (Hardware & Networking)
+
 - [x] Section 2.1: No Resource Limits → **Phase 1**
 - [x] Section 2.2: SD Card Write Amplification → **Phase 1**
 - [x] Section 2.3: Healthcheck Interval → **Phase 1**
@@ -1107,6 +1161,7 @@ docker stats
 - [ ] Section 2.6: Circuit Breaker → **Skipped** (over-engineering)
 
 ### Jurgen (Security)
+
 - [x] Section 3.1: Plaintext Secrets → **Phase 1** (chmod 600 on Pi)
 - [x] Section 3.2: SSL Verification Disabled → **Phase 6**
 - [x] Section 3.3: CORS Wildcard → **Phase 1**
@@ -1114,6 +1169,7 @@ docker stats
 - [ ] Section 3.5: No Account Lockout → **Skipped** (home network)
 
 ### Xander (Frontend)
+
 - [x] Section 4.2: Poor Semantic HTML → **Phase 4**
 - [x] Section 4.3: Suboptimal HTMX → **Phase 4**
 - [x] Section 4.4: No Loading States → **Phase 4**
@@ -1122,6 +1178,7 @@ docker stats
 - [ ] Section 4.6: CDN Single Point → **Skipped** (acceptable risk)
 
 ### Leonie (Architecture)
+
 - [x] Section 5.2: Tight Coupling → **Phase 3**
 - [ ] Section 5.1: Missing Data Layer → **Skipped** (no DB needed)
 - [ ] Section 5.3: No Domain Layer → **Skipped** (over-engineering)
@@ -1129,6 +1186,7 @@ docker stats
 - [ ] Section 5.5: No API Abstraction → **Skipped** (over-engineering)
 
 ### Dependency Updates
+
 - [x] Update Packages → **Phase 1**
 
 ---
@@ -1138,33 +1196,39 @@ docker stats
 ### Why We're Skipping Certain Items
 
 **Tests (70% coverage):**
+
 - Single user (yourself)
 - Test by using it
 - Would take 40-60 hours
 - Not cost-effective for home project
 
 **SQLite Persistence:**
+
 - Re-auth on restart is tolerable
 - Adds complexity (migrations, queries)
 - 20+ hours implementation
 - Not worth it unless restart is frequent
 
 **WCAG Compliance:**
+
 - You're the only user
 - Unless you need screen reader, skip
 - 20+ hours for full compliance
 
 **Circuit Breakers:**
+
 - Home network is stable
 - TV is 3 feet away
 - Over-engineering for local services
 
 **Metrics/Monitoring:**
+
 - Structured logs are sufficient
 - Prometheus overkill for single Pi
 - Check logs if issues occur
 
 **CI/CD Pipeline:**
+
 - Deploy manually from dev machine
 - No team, no need for automation
 - GitHub Actions would be nice-to-have
@@ -1191,18 +1255,22 @@ docker stats
 ### If You Get Stuck
 
 **Phase 2 (Refactor main.py):**
+
 - Reference: FastAPI app factory pattern
 - Example: <https://github.com/zhanymkanov/fastapi-best-practices>
 
 **Phase 3 (Service Decoupling):**
+
 - Reference: Python Protocols
 - Docs: <https://docs.python.org/3/library/typing.html#typing.Protocol>
 
 **Phase 4 (Frontend):**
+
 - HTMX docs: <https://htmx.org/docs/>
 - Semantic HTML guide: <https://developer.mozilla.org/en-US/docs/Glossary/Semantics>
 
 **Phase 5 (Auto-save token):**
+
 - Python pathlib: <https://docs.python.org/3/library/pathlib.html>
 - File I/O: <https://docs.python.org/3/tutorial/inputoutput.html>
 

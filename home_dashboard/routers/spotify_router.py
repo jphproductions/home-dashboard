@@ -14,14 +14,19 @@ from slowapi.util import get_remote_address
 
 from home_dashboard.config import Settings, get_settings
 from home_dashboard.dependencies import get_http_client, get_spotify_auth_manager, get_tv_state_manager
+from home_dashboard.logging_config import get_logger, log_with_context
 from home_dashboard.protocols import TVServiceProtocol
 from home_dashboard.security import verify_api_key
 from home_dashboard.services import spotify_service, tv_tizen_service
 from home_dashboard.state_managers import SpotifyAuthManager, TVStateManager
+from home_dashboard.utils.env_updater import get_env_path, update_env_file
 from home_dashboard.views.template_renderer import TemplateRenderer
 
-router = APIRouter(dependencies=[Depends(verify_api_key)])
+# Note: OAuth endpoints (/auth/login, /auth/callback) are excluded from API key requirement
+# All other endpoints require API key via Depends(verify_api_key) on each route
+router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
+logger = get_logger(__name__)
 
 # OAuth state storage with TTL cleanup
 # States expire after 10 minutes to prevent memory leaks from abandoned auth flows
@@ -97,6 +102,7 @@ async def get_spotify_status(
     auth_manager: SpotifyAuthManager = Depends(get_spotify_auth_manager),
     settings: Settings = Depends(get_settings),
     format: Literal["json", "html"] = Query(default="json", description="Response format"),
+    _api_key: str = Depends(verify_api_key),
 ):
     """Get current Spotify playback status.
 
@@ -146,6 +152,7 @@ async def play(
     auth_manager: SpotifyAuthManager = Depends(get_spotify_auth_manager),
     settings: Settings = Depends(get_settings),
     format: Literal["json", "html"] = Query(default="html", description="Response format"),
+    _api_key: str = Depends(verify_api_key),
 ):
     """Resume playback.
 
@@ -163,7 +170,7 @@ async def play(
         await asyncio.sleep(0.5)  # Wait for Spotify API to update state
 
         if format == "html":
-            return await TemplateRenderer.render_spotify_tile(request, client, auth_manager, settings)
+            return await TemplateRenderer.render_spotify_playback_status(request, client, auth_manager, settings)
 
         return {"status": "playing"}
     except Exception as e:
@@ -189,6 +196,7 @@ async def pause(
     auth_manager: SpotifyAuthManager = Depends(get_spotify_auth_manager),
     settings: Settings = Depends(get_settings),
     format: Literal["json", "html"] = Query(default="html", description="Response format"),
+    _api_key: str = Depends(verify_api_key),
 ):
     """Pause playback.
 
@@ -206,7 +214,7 @@ async def pause(
         await asyncio.sleep(0.5)  # Wait for Spotify API to update state
 
         if format == "html":
-            return await TemplateRenderer.render_spotify_tile(request, client, auth_manager, settings)
+            return await TemplateRenderer.render_spotify_playback_status(request, client, auth_manager, settings)
 
         return {"status": "paused"}
     except Exception as e:
@@ -220,6 +228,7 @@ async def next_track(
     auth_manager: SpotifyAuthManager = Depends(get_spotify_auth_manager),
     settings: Settings = Depends(get_settings),
     format: Literal["json", "html"] = Query(default="html", description="Response format"),
+    _api_key: str = Depends(verify_api_key),
 ):
     """Skip to next track.
 
@@ -237,7 +246,7 @@ async def next_track(
         await asyncio.sleep(0.5)  # Wait for Spotify API to update state
 
         if format == "html":
-            return await TemplateRenderer.render_spotify_tile(request, client, auth_manager, settings)
+            return await TemplateRenderer.render_spotify_playback_status(request, client, auth_manager, settings)
 
         return {"status": "next_track"}
     except Exception as e:
@@ -251,6 +260,7 @@ async def previous_track(
     auth_manager: SpotifyAuthManager = Depends(get_spotify_auth_manager),
     settings: Settings = Depends(get_settings),
     format: Literal["json", "html"] = Query(default="html", description="Response format"),
+    _api_key: str = Depends(verify_api_key),
 ):
     """Go to previous track.
 
@@ -268,7 +278,7 @@ async def previous_track(
         await asyncio.sleep(0.5)  # Wait for Spotify API to update state
 
         if format == "html":
-            return await TemplateRenderer.render_spotify_tile(request, client, auth_manager, settings)
+            return await TemplateRenderer.render_spotify_playback_status(request, client, auth_manager, settings)
 
         return {"status": "previous_track"}
     except Exception as e:
@@ -284,6 +294,7 @@ async def wake_tv_and_play(
     tv_manager: TVStateManager = Depends(get_tv_state_manager),
     settings: Settings = Depends(get_settings),
     format: Literal["json", "html"] = Query(default="html", description="Response format"),
+    _api_key: str = Depends(verify_api_key),
 ):
     """Wake TV and transfer Spotify playback to TV.
 
@@ -300,9 +311,10 @@ async def wake_tv_and_play(
     """
     try:
         await spotify_service.wake_tv_and_play(client, auth_manager, tv_service, tv_manager, settings)
+        await asyncio.sleep(0.5)  # Wait for Spotify API to update state
 
         if format == "html":
-            return await TemplateRenderer.render_spotify_tile(request, client, auth_manager, settings)
+            return await TemplateRenderer.render_spotify_playback_status(request, client, auth_manager, settings)
 
         return {"status": "wake_and_play"}
     except Exception as e:
@@ -314,6 +326,7 @@ async def play_playlist(
     playlist_uri: str,
     client: httpx.AsyncClient = Depends(get_http_client),
     auth_manager: SpotifyAuthManager = Depends(get_spotify_auth_manager),
+    _api_key: str = Depends(verify_api_key),
 ):
     """Start playing a playlist (from URL path).
 
@@ -338,6 +351,7 @@ async def play_playlist_from_form(
     client: httpx.AsyncClient = Depends(get_http_client),
     auth_manager: SpotifyAuthManager = Depends(get_spotify_auth_manager),
     settings: Settings = Depends(get_settings),
+    _api_key: str = Depends(verify_api_key),
 ):
     """Start playing a playlist (from form data) and return updated tile HTML.
 
@@ -360,9 +374,10 @@ async def play_playlist_from_form(
 
         # Start playing playlist
         await spotify_service.play_playlist(client, playlist_uri_value, auth_manager, settings)
+        await asyncio.sleep(0.5)  # Wait for Spotify API to update state
 
-        # Return updated tile
-        return await TemplateRenderer.render_spotify_tile(request, client, auth_manager, settings)
+        # Return updated playback status fragment
+        return await TemplateRenderer.render_spotify_playback_status(request, client, auth_manager, settings)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Play playlist error: {str(e)}") from e
 
@@ -370,6 +385,7 @@ async def play_playlist_from_form(
 @router.get("/auth/status")
 async def auth_status(
     format: Literal["json", "html"] = Query(default="json", description="Response format"),
+    _api_key: str = Depends(verify_api_key),
 ):
     """Check if Spotify is authenticated.
 
@@ -457,12 +473,118 @@ async def auth_callback(
         if not refresh_token:
             raise HTTPException(status_code=500, detail="No refresh token received")
 
-        # Display token for user to copy to .env file
-        html_content = f"""
+        # Auto-save refresh token to .env
+        save_success = False
+        save_error = ""
+        try:
+            env_path = get_env_path()
+            update_env_file(env_path, "SPOTIFY_REFRESH_TOKEN", refresh_token)
+            save_success = True
+
+            log_with_context(
+                logger,
+                "info",
+                "Spotify refresh token saved to .env",
+                event_type="spotify_auth_success",
+            )
+
+        except Exception as e:
+            save_error = str(e)
+            log_with_context(
+                logger,
+                "error",
+                "Failed to save refresh token to .env",
+                event_type="env_update_failed",
+                error=save_error,
+            )
+
+        # Display appropriate success message
+        if save_success:
+            html_content = """
         <!DOCTYPE html>
         <html>
         <head>
             <title>Spotify Authentication Successful</title>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    max-width: 700px;
+                    margin: 50px auto;
+                    padding: 20px;
+                    background-color: #f5f5f5;
+                }
+                .container {
+                    background-color: white;
+                    padding: 40px;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    text-align: center;
+                }
+                h1 {
+                    color: #1DB954;
+                    margin-bottom: 20px;
+                }
+                .success-icon {
+                    font-size: 64px;
+                    margin-bottom: 20px;
+                }
+                .info-box {
+                    background-color: #d1ecf1;
+                    padding: 20px;
+                    border-radius: 4px;
+                    border-left: 4px solid #0c5460;
+                    margin: 20px 0;
+                    text-align: left;
+                }
+                .info-box strong {
+                    display: block;
+                    margin-bottom: 10px;
+                    color: #0c5460;
+                }
+                .button {
+                    background-color: #1DB954;
+                    color: white;
+                    border: none;
+                    padding: 12px 30px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 16px;
+                    margin-top: 20px;
+                    text-decoration: none;
+                    display: inline-block;
+                }
+                .button:hover {
+                    background-color: #1ed760;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="success-icon">✅</div>
+                <h1>Authentication Complete!</h1>
+
+                <div class="info-box">
+                    <strong>✨ Token automatically saved to .env</strong>
+                    <p>Your Spotify refresh token has been securely saved to your <code>.env</code> file.</p>
+                    <p><strong>Next step:</strong> Please restart the dashboard application for the changes to take effect.</p>
+                </div>
+
+                <a href="/" class="button">← Return to Dashboard</a>
+
+                <p style="margin-top: 30px; color: #666; font-size: 14px;">
+                    After restarting, you'll be able to control Spotify playback from the dashboard.
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+        else:
+            # Fallback to manual save if auto-save failed
+            html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Spotify Authentication - Manual Save Required</title>
             <style>
                 body {{
                     font-family: Arial, sans-serif;
@@ -478,7 +600,7 @@ async def auth_callback(
                     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                 }}
                 h1 {{
-                    color: #1DB954;
+                    color: #ff9800;
                 }}
                 .token-box {{
                     background-color: #f0f0f0;
@@ -496,9 +618,13 @@ async def auth_callback(
                     border-left: 4px solid #ffc107;
                     margin: 20px 0;
                 }}
-                .instructions ol {{
-                    margin: 10px 0;
-                    padding-left: 20px;
+                .error-info {{
+                    background-color: #f8d7da;
+                    padding: 15px;
+                    border-radius: 4px;
+                    border-left: 4px solid #dc3545;
+                    margin: 20px 0;
+                    color: #721c24;
                 }}
                 button {{
                     background-color: #1DB954;
@@ -513,10 +639,6 @@ async def auth_callback(
                 button:hover {{
                     background-color: #1ed760;
                 }}
-                .success {{
-                    color: #1DB954;
-                    font-weight: bold;
-                }}
                 a {{
                     color: #1DB954;
                     text-decoration: none;
@@ -528,10 +650,14 @@ async def auth_callback(
         </head>
         <body>
             <div class="container">
-                <h1>✅ Spotify Authentication Successful!</h1>
+                <h1>⚠️ Authentication Successful - Manual Save Required</h1>
+
+                <div class="error-info">
+                    <strong>Auto-save failed:</strong> {save_error}
+                </div>
 
                 <div class="instructions">
-                    <strong>⚠️ Important: Complete Setup</strong>
+                    <strong>Please manually save your token:</strong>
                     <ol>
                         <li>Copy the refresh token below</li>
                         <li>Open your <code>.env</code> file</li>
@@ -547,11 +673,6 @@ async def auth_callback(
                 <span id="copyStatus" style="margin-left: 10px; color: #1DB954;"></span>
 
                 <p style="margin-top: 30px;">
-                    <strong>Note:</strong> This token will only be shown once.
-                    Keep it secure and don't share it publicly.
-                </p>
-
-                <p>
                     <a href="/">← Return to Dashboard</a>
                 </p>
             </div>
@@ -565,7 +686,7 @@ async def auth_callback(
                             document.getElementById('copyStatus').textContent = '';
                         }}, 2000);
                     }}, function(err) {{
-                        document.getElementById('copyStatus').textContent = '✗ Copy failed - please select and copy manually';
+                        document.getElementById('copyStatus').textContent = '✗ Copy failed';
                         document.getElementById('copyStatus').style.color = 'red';
                     }});
                 }}

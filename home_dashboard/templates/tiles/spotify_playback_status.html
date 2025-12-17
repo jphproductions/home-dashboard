@@ -1,0 +1,13 @@
+<!-- Playback Status Fragment - Used for HTMX partial updates -->
+{% if track_name %}
+<div class="spotify-track-info">
+    <strong>Now Playing:</strong><br>
+    🎵 {{ track_name }}<br>
+    {% if artist_name %}👤 {{ artist_name }}<br>{% endif %}
+    {% if device_name %}📱 {{ device_name }}{% endif %}
+</div>
+{% else %}
+<div class="spotify-track-info caption">
+    Nothing currently playing
+</div>
+{% endif %}

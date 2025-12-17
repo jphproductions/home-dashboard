@@ -1,4 +1,4 @@
-<div id="spotify-tile" class="tile spotify-area">
+<article id="spotify-tile" class="tile spotify-area">
     <h2>🎵 Spotify</h2>
 
     {% if not authenticated %}
@@ -15,19 +15,21 @@
     </p>
 
     {% else %}
-    <!-- Current Track Info -->
-    {% if track_name %}
-    <div class="spotify-track-info">
-        <strong>Now Playing:</strong><br>
-        🎵 {{ track_name }}<br>
-        {% if artist_name %}👤 {{ artist_name }}<br>{% endif %}
-        {% if device_name %}📱 {{ device_name }}{% endif %}
+    <!-- Current Track Info - Update this section independently -->
+    <div id="playback-status">
+        {% if track_name %}
+        <div class="spotify-track-info">
+            <strong>Now Playing:</strong><br>
+            🎵 {{ track_name }}<br>
+            {% if artist_name %}👤 {{ artist_name }}<br>{% endif %}
+            {% if device_name %}📱 {{ device_name }}{% endif %}
+        </div>
+        {% else %}
+        <div class="spotify-track-info caption">
+            Nothing currently playing
+        </div>
+        {% endif %}
     </div>
-    {% else %}
-    <div class="spotify-track-info caption">
-        Nothing currently playing
-    </div>
-    {% endif %}
 
     <!-- Playlist Selection -->
     <div class="spotify-section">
@@ -43,20 +45,25 @@
                 class="button button-secondary button-nowrap"
                 hx-post="/api/spotify/play-playlist-from-form"
                 hx-include="#playlist-select"
-                hx-target="#spotify-tile"
-                hx-swap="outerHTML">
+                hx-target="#playback-status"
+                hx-swap="innerHTML"
+                hx-indicator="#spotify-loading">
                 ▶️ Play
             </button>
         </div>
     </div>
+
+    <!-- Loading indicator -->
+    <div id="spotify-loading" class="htmx-indicator">⏳ Updating...</div>
 
     <!-- Playback Controls -->
     <div class="spotify-controls">
         <button
             class="button button-secondary"
             hx-post="/api/spotify/previous"
-            hx-target="#spotify-tile"
-            hx-swap="outerHTML">
+            hx-target="#playback-status"
+            hx-swap="innerHTML"
+            hx-indicator="#spotify-loading">
             ⏮️ Previous
         </button>
 
@@ -64,16 +71,18 @@
         <button
             class="button button-secondary"
             hx-post="/api/spotify/pause"
-            hx-target="#spotify-tile"
-            hx-swap="outerHTML">
+            hx-target="#playback-status"
+            hx-swap="innerHTML"
+            hx-indicator="#spotify-loading">
             ⏸️ Pause
         </button>
         {% else %}
         <button
             class="button button-secondary"
             hx-post="/api/spotify/play"
-            hx-target="#spotify-tile"
-            hx-swap="outerHTML">
+            hx-target="#playback-status"
+            hx-swap="innerHTML"
+            hx-indicator="#spotify-loading">
             ▶️ Play
         </button>
         {% endif %}
@@ -81,8 +90,9 @@
         <button
             class="button button-secondary"
             hx-post="/api/spotify/next"
-            hx-target="#spotify-tile"
-            hx-swap="outerHTML">
+            hx-target="#playback-status"
+            hx-swap="innerHTML"
+            hx-indicator="#spotify-loading">
             ⏭️ Next
         </button>
 
@@ -98,13 +108,14 @@
     <button
         class="button button-full-width"
         hx-post="/api/spotify/wake-and-play"
-        hx-target="#spotify-tile"
-        hx-swap="outerHTML">
+        hx-target="#playback-status"
+        hx-swap="innerHTML"
+        hx-indicator="#spotify-loading">
         📺 Wake TV & Play
     </button>
 
     {% endif %}
-</div>
+</article>
 
 <script>
     // Smart auto-refresh: reload tile when track is about to end or every 10s

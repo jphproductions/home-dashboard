@@ -94,6 +94,49 @@ class TemplateRenderer:
         )
 
     @staticmethod
+    async def render_spotify_playback_status(
+        request: Request,
+        client: httpx.AsyncClient,
+        auth_manager: "SpotifyAuthManager",
+        settings: Settings,
+    ) -> HTMLResponse:
+        """Render just the Spotify playback status fragment for HTMX partial updates.
+
+        Args:
+            request: FastAPI request object
+            client: HTTP client for API calls
+            auth_manager: Spotify authentication manager
+            settings: Settings instance
+
+        Returns:
+            HTMLResponse with rendered playback status fragment
+        """
+        # Get current track status
+        try:
+            track_data = await spotify_service.get_current_track(client, auth_manager, settings)
+        except Exception as e:
+            log_with_context(
+                logger,
+                "warning",
+                "Failed to get current Spotify track",
+                error=str(e),
+                error_type=type(e).__name__,
+                event_type="spotify_track_error",
+            )
+            track_data = None
+
+        return templates.TemplateResponse(
+            "tiles/spotify_playback_status.html",
+            {
+                "request": request,
+                "track_name": track_data.track_name if track_data else None,
+                "artist_name": track_data.artist_name if track_data else None,
+                "device_name": track_data.device_name if track_data else None,
+                "is_playing": track_data.is_playing if track_data else False,
+            },
+        )
+
+    @staticmethod
     async def render_weather_tile(
         request: Request,
         client: httpx.AsyncClient,
