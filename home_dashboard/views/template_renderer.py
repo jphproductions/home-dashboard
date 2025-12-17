@@ -32,6 +32,39 @@ class TemplateRenderer:
         return templates.TemplateResponse("index.html", {"request": request})
 
     @staticmethod
+    def render_spotify_auth_success(request: Request) -> HTMLResponse:
+        """Render Spotify OAuth success page (token auto-saved).
+
+        Args:
+            request: FastAPI request object
+
+        Returns:
+            HTMLResponse with success message
+        """
+        return templates.TemplateResponse("spotify_auth_success.html", {"request": request})
+
+    @staticmethod
+    def render_spotify_auth_manual(request: Request, refresh_token: str, error_message: str) -> HTMLResponse:
+        """Render Spotify OAuth manual save page (auto-save failed).
+
+        Args:
+            request: FastAPI request object
+            refresh_token: The refresh token to display
+            error_message: Error message explaining why auto-save failed
+
+        Returns:
+            HTMLResponse with manual save instructions
+        """
+        return templates.TemplateResponse(
+            "spotify_auth_manual.html",
+            {
+                "request": request,
+                "refresh_token": refresh_token,
+                "error_message": error_message,
+            },
+        )
+
+    @staticmethod
     async def render_spotify_tile(
         request: Request,
         client: httpx.AsyncClient,
