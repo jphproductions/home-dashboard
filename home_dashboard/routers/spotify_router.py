@@ -404,8 +404,33 @@ async def auth_status(
     return {"authenticated": authenticated}
 
 
+@router.get("/auth/token")
+async def get_access_token(
+    client: httpx.AsyncClient = Depends(get_http_client),
+    auth_manager: SpotifyAuthManager = Depends(get_spotify_auth_manager),
+    settings: Settings = Depends(get_settings),
+    _api_key: str = Depends(verify_api_key),
+):
+    """Get current Spotify access token (for debugging/manual API calls).
+
+    Returns:
+        JSON with access token and expiration info
+    """
+    try:
+        access_token = await spotify_service._get_access_token(client, auth_manager, settings)
+        if not access_token:
+            raise HTTPException(status_code=401, detail="Not authenticated - no valid token available")
+
+        return {
+            "access_token": access_token,
+            "note": "Use this token in Authorization: Bearer <token> header for Spotify API calls",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get token: {str(e)}") from e
+
+
 @router.get("/auth/login")
-async def auth_login(settings: Settings = Depends(get_settings), _api_key: str = Depends(verify_api_key)):
+async def auth_login(settings: Settings = Depends(get_settings)):
     """Initiate Spotify OAuth flow."""
     # Clean up expired states before adding new one
     _cleanup_expired_oauth_states()
@@ -435,6 +460,7 @@ async def auth_callback(
     state: str | None = None,
     error: str | None = None,
     client: httpx.AsyncClient = Depends(get_http_client),
+    auth_manager: SpotifyAuthManager = Depends(get_spotify_auth_manager),
     settings: Settings = Depends(get_settings),
 ):
     """Handle Spotify OAuth callback."""
@@ -473,7 +499,12 @@ async def auth_callback(
         if not refresh_token:
             raise HTTPException(status_code=500, detail="No refresh token received")
 
-        # Auto-save refresh token to .env
+        # Update refresh token in runtime (Settings and AuthManager)
+        # This allows immediate use without restart
+        settings.update_spotify_refresh_token(refresh_token)
+        await auth_manager.set_refresh_token(refresh_token)
+
+        # Also save to .env for persistence across restarts
         save_success = False
         save_error = ""
         try:
@@ -484,7 +515,7 @@ async def auth_callback(
             log_with_context(
                 logger,
                 "info",
-                "Spotify refresh token saved to .env",
+                "Spotify refresh token saved to .env and updated in memory",
                 event_type="spotify_auth_success",
             )
 
@@ -493,7 +524,7 @@ async def auth_callback(
             log_with_context(
                 logger,
                 "error",
-                "Failed to save refresh token to .env",
+                "Failed to save refresh token to .env (but updated in memory)",
                 event_type="env_update_failed",
                 error=save_error,
             )

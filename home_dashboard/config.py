@@ -148,6 +148,23 @@ class Settings(BaseSettings):
             raise ValueError("spotify_redirect_uri must be a valid http:// or https:// URL")
         return v
 
+    def update_spotify_refresh_token(self, refresh_token: str) -> None:
+        """Update the Spotify refresh token at runtime.
+
+        This allows updating the token without restarting the application.
+        The token will persist in memory for the current session.
+
+        Args:
+            refresh_token: New Spotify refresh token
+        """
+        self.spotify_refresh_token = refresh_token
+        log_with_context(
+            logger,
+            "info",
+            "Spotify refresh token updated in settings",
+            event_type="settings_token_updated",
+        )
+
 
 # Singleton settings instance (cached for performance)
 _settings_instance: Settings | None = None

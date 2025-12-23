@@ -38,6 +38,7 @@ class SpotifyAuthManager(StateManager):
         """Initialize the Spotify auth manager."""
         self._access_token: str | None = None
         self._token_expires_at: float = 0
+        self._refresh_token: str | None = None
         self._lock = asyncio.Lock()
 
     async def initialize(self) -> None:
@@ -47,10 +48,11 @@ class SpotifyAuthManager(StateManager):
 
     async def cleanup(self) -> None:
         """Cleanup resources."""
-        # Clear token on shutdown
+        # Clear tokens on shutdown
         async with self._lock:
             self._access_token = None
             self._token_expires_at = 0
+            self._refresh_token = None
 
     async def get_token(self) -> str | None:
         """Get the current access token if available and not expired.
@@ -73,6 +75,24 @@ class SpotifyAuthManager(StateManager):
         async with self._lock:
             self._access_token = token
             self._token_expires_at = time.time() + expires_in
+
+    async def set_refresh_token(self, refresh_token: str) -> None:
+        """Set the refresh token.
+
+        Args:
+            refresh_token: The refresh token string
+        """
+        async with self._lock:
+            self._refresh_token = refresh_token
+
+    async def get_refresh_token(self) -> str | None:
+        """Get the current refresh token if available.
+
+        Returns:
+            Refresh token string or None if not set
+        """
+        async with self._lock:
+            return self._refresh_token
 
 
 class TVStateManager(StateManager):

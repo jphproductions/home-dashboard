@@ -67,20 +67,22 @@
 </head>
 <body>
     <div class="container">
-        <h1>⚠️ Authentication Successful - Manual Save Required</h1>
+        <h1>✅ Authentication Successful</h1>
 
         <div class="error-info">
-            <strong>Auto-save failed:</strong> {{ error_message }}
+            <strong>Note:</strong> Token saved to memory but not persisted to .env: {{ error_message }}
         </div>
 
         <div class="instructions">
-            <strong>Please manually save your token:</strong>
+            <strong>Your Spotify controls are ready to use immediately!</strong>
+            <p>However, to persist the token across restarts, please manually save it:</p>
             <ol>
                 <li>Copy the refresh token below</li>
                 <li>Open your <code>.env</code> file</li>
                 <li>Set <code>SPOTIFY_REFRESH_TOKEN=your_token_here</code></li>
-                <li>Restart the dashboard application</li>
+                <li>Save the file</li>
             </ol>
+            <p style="margin-top: 10px;"><strong>No restart needed</strong> - the token is already active in memory!</p>
         </div>
 
         <h3>Your Refresh Token:</h3>
