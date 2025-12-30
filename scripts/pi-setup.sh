@@ -261,8 +261,8 @@ configure_environment() {
     # IFTTT Configuration
     echo ""
     print_info "IFTTT Configuration (press Enter to skip if not using)"
-    IFTTT_WEBHOOK_KEY=$(prompt_input "IFTTT Webhook Key" "")
-    IFTTT_EVENT_NAME=$(prompt_input "IFTTT Event Name" "ring_phone")
+    IFTTT_WEBHOOK_KEY=$(prompt_input "IFTTT Webhook Key" "placeholder-webhook-key")
+    IFTTT_EVENT_NAME=$(prompt_input "IFTTT Event Name" "placeholder-event-name")
 
     # Security Configuration
     echo ""
