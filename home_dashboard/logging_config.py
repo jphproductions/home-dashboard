@@ -28,7 +28,10 @@ def setup_logging(log_level: str = "INFO") -> logging.Logger:
 
     # Get root logger
     root_logger = logging.getLogger()
-    root_logger.setLevel(getattr(logging, log_level.upper()))
+    # Default to INFO if log_level is empty or invalid
+    if not log_level or not log_level.strip():
+        log_level = "INFO"
+    root_logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
 
     # Remove any existing handlers
     root_logger.handlers.clear()

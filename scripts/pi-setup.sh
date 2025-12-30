@@ -337,23 +337,35 @@ start_docker_container() {
         sg docker -c "docker compose -f docker/docker-compose.yml up -d --build"
     fi
 
-    print_info "Waiting for container to be healthy..."
+    print_info "Waiting for container to start..."
     sleep 5
 
-    # Check container status
-    if docker ps &> /dev/null 2>&1; then
+    # Check container status (including stopped containers)
+    if docker ps -a &> /dev/null 2>&1; then
         CONTAINER_CHECK=$(docker ps | grep "home-dashboard" || true)
+        CONTAINER_STATUS=$(docker ps -a --filter "name=dashboard" --format "{{.Names}} - {{.Status}}")
     else
         CONTAINER_CHECK=$(sg docker -c "docker ps" | grep "home-dashboard" || true)
+        CONTAINER_STATUS=$(sg docker -c "docker ps -a --filter 'name=dashboard' --format '{{.Names}} - {{.Status}}'")
     fi
 
     if [ -n "$CONTAINER_CHECK" ]; then
         print_success "Docker container is running"
         echo "$CONTAINER_CHECK"
     else
-        print_error "Failed to start Docker container"
-        print_info "Check logs with: sg docker -c 'docker logs home-dashboard-dashboard-1'"
-        print_info "Or after logout/login: docker logs home-dashboard-dashboard-1"
+        print_error "Container failed to start or exited"
+        echo ""
+        print_info "Container status:"
+        echo "$CONTAINER_STATUS"
+        echo ""
+        print_info "Container logs (last 30 lines):"
+        if docker logs &> /dev/null 2>&1; then
+            docker logs --tail 30 docker-dashboard-1 2>&1 || true
+        else
+            sg docker -c "docker logs --tail 30 docker-dashboard-1" 2>&1 || true
+        fi
+        echo ""
+        print_info "To view full logs: sg docker -c 'docker logs docker-dashboard-1'"
         exit 1
     fi
 
@@ -468,7 +480,7 @@ print_next_steps() {
     echo "   - Access from other devices: http://$(hostname).local:8000"
     echo ""
     echo "${BLUE}Useful Commands:${NC}"
-    echo "  View logs:          docker logs -f home-dashboard-dashboard-1"
+    echo "  View logs:          docker logs -f docker-dashboard-1"
     echo "  Restart dashboard:  docker compose -f $REPO_DIR/docker/docker-compose.yml restart"
     echo "  Check services:     systemctl status docker-dashboard.service"
     echo "                      systemctl status kiosk-chromium.service"
