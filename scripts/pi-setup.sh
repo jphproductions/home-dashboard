@@ -167,7 +167,7 @@ install_packages() {
     print_header "Step 3: Installing Required Packages"
 
     print_info "Installing Chromium, unclutter, xdotool, and git..."
-    sudo apt install -y chromium-browser unclutter xdotool git
+    sudo apt install -y chromium unclutter xdotool git
 
     print_success "Required packages installed"
     echo ""

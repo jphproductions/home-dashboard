@@ -76,3 +76,23 @@ async def get_tv_status(
         return {"status": "on" if is_on else "off", "is_on": is_on}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"TV power off error: {str(e)}") from e
+
+
+@router.get("/info")
+async def get_tv_info(
+    format: Literal["json", "html"] = Query(default="json", description="Response format"),
+    _api_key: str = Depends(verify_api_key),
+):
+    """Get TV information.
+
+    Args:
+        format: Response format - 'json' for API (html not applicable for this endpoint)
+
+    Returns:
+        JSON with TV information
+    """
+    try:
+        info = await tv_tizen_service.get_info()
+        return info
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"TV info error: {str(e)}") from e

@@ -1,12 +1,14 @@
 """Tizen WebSocket service for Samsung TV control."""
 
 import asyncio
+import base64
 import json
 import ssl
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import TypeVar
 
+import httpx
 import websockets
 from websockets.exceptions import (
     ConnectionClosedError,
@@ -88,19 +90,6 @@ async def _retry_with_backoff(
     raise TVConnectionException(f"{operation_name} failed with no exception recorded")
 
 
-def _create_ssl_context() -> ssl.SSLContext:
-    """Create SSL context for self-signed certificates.
-
-    Per websockets 12.0 best practices: Use ssl_context instead of ssl=False.
-    This properly configures SSL while disabling certificate verification
-    for Samsung TV's self-signed certificates.
-    """
-    ssl_context = ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
-    return ssl_context
-
-
 @asynccontextmanager
 async def _connect_to_tv(settings: Settings) -> AsyncGenerator:
     """Connect to TV with proper error handling.
@@ -120,13 +109,14 @@ async def _connect_to_tv(settings: Settings) -> AsyncGenerator:
     Raises:
         TVException: If connection fails
     """
-    ws_url = f"wss://{settings.tv_ip}:8002/api/v2/channels/samsung.remote.control?name=PythonDashboard"
-    ssl_context = _create_ssl_context()
+    # Base64 encode device name as per Samsung TV API requirements
+    device_name = base64.b64encode(str.encode("HomeDashboard")).decode("utf-8")
+    ws_url = f"wss://{settings.tv_ip}:8002/api/v2/channels/samsung.remote.control?name={device_name}"
 
     try:
         async with websockets.connect(
             ws_url,
-            ssl=ssl_context,  # ✅ Use SSL context, not ssl=False
+            ssl=ssl.SSLContext(ssl.PROTOCOL_TLS),
             ping_interval=20,
             ping_timeout=10,
             close_timeout=5,
@@ -138,7 +128,7 @@ async def _connect_to_tv(settings: Settings) -> AsyncGenerator:
                 "params": {
                     "sessionId": "",
                     "clientIp": "",
-                    "deviceName": "PythonDashboard",
+                    "deviceName": "HomeDashboard",
                 },
             }
             await websocket.send(json.dumps(handshake))
@@ -146,6 +136,8 @@ async def _connect_to_tv(settings: Settings) -> AsyncGenerator:
             # Wait for handshake response with timeout
             try:
                 response = await asyncio.wait_for(websocket.recv(), timeout=5.0)
+                response_data = json.loads(response)
+
                 log_with_context(
                     logger,
                     "debug",
@@ -154,6 +146,25 @@ async def _connect_to_tv(settings: Settings) -> AsyncGenerator:
                     response=str(response),
                     event_type="tv_handshake",
                 )
+                # Check if TV authorized the connection
+                if response_data.get("event") == "ms.channel.unauthorized":
+                    raise TVConnectionException(
+                        "TV connection unauthorized. Please allow access on the TV.",
+                        details={
+                            "tv_ip": str(settings.tv_ip),
+                            "error_type": "unauthorized",
+                            "hint": "Check TV for authorization prompt",
+                        },
+                    )
+                elif response_data.get("event") != "ms.channel.connect":
+                    raise TVConnectionException(
+                        f"Unexpected handshake response: {response_data.get('event')}",
+                        details={
+                            "tv_ip": str(settings.tv_ip),
+                            "error_type": "unexpected_response",
+                            "response": response_data,
+                        },
+                    )
             except TimeoutError:
                 raise TVConnectionException(
                     "TV handshake timeout",
@@ -201,14 +212,6 @@ async def _connect_to_tv(settings: Settings) -> AsyncGenerator:
             },
         ) from e
 
-    except OSError as e:
-        raise TVConnectionException(
-            f"Cannot reach TV at {settings.tv_ip}: {e}",
-            details={
-                "tv_ip": str(settings.tv_ip),
-                "error_type": "network_error",
-            },
-        ) from e
     except TimeoutError:
         raise TVConnectionException(
             "TV connection timeout",
@@ -218,6 +221,15 @@ async def _connect_to_tv(settings: Settings) -> AsyncGenerator:
                 "timeout": "10s",
             },
         ) from None
+
+    except OSError as e:
+        raise TVConnectionException(
+            f"Cannot reach TV at {settings.tv_ip}: {e}",
+            details={
+                "tv_ip": str(settings.tv_ip),
+                "error_type": "network_error",
+            },
+        ) from e
 
 
 async def wake(settings: Settings | None = None, tv_manager: TVStateManager | None = None) -> str:
@@ -241,13 +253,14 @@ async def wake(settings: Settings | None = None, tv_manager: TVStateManager | No
 
     async def _send_wake_command() -> str:
         async with _connect_to_tv(settings) as websocket:
-            # Send KEY_POWER
+            # Send KEY_VOLUP for initial authorization testing
             key_command = {
                 "method": "ms.remote.control",
                 "params": {
-                    "Cmd": "SendRemoteKey",
-                    "DataOfCmd": "KEY_POWER",
+                    "Cmd": "Click",
+                    "DataOfCmd": "KEY_VOLUP",
                     "Option": "false",
+                    "TypeOfRemote": "SendRemoteKey",
                 },
             }
             await websocket.send(json.dumps(key_command))
@@ -255,11 +268,11 @@ async def wake(settings: Settings | None = None, tv_manager: TVStateManager | No
             log_with_context(
                 logger,
                 "info",
-                "Successfully sent KEY_POWER to TV",
+                "Successfully sent KEY_VOLUP to TV",
                 tv_ip=str(settings.tv_ip),
                 event_type="tv_wake_success",
             )
-            return "KEY_POWER sent to TV"
+            return "KEY_VOLUP sent to TV"
 
     try:
         result: str = await _retry_with_backoff(_send_wake_command, "TV wake command")
@@ -351,3 +364,59 @@ async def get_status(settings: Settings | None = None) -> bool:
             event_type="tv_status_unexpected_error",
         )
         return False
+
+
+async def get_info(settings: Settings | None = None) -> dict:
+    """
+    Get TV information via HTTP REST API.
+
+    Makes a GET request to the TV's REST API endpoint.
+
+    Args:
+        settings: Settings instance (defaults to singleton)
+
+    Returns:
+        Dictionary with TV information.
+
+    Raises:
+        TVConnectionException: If connection fails.
+    """
+    if settings is None:
+        settings = get_settings()
+
+    url = f"http://{settings.tv_ip}:8001/api/v2/"
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            response_data = response.json()
+
+            log_with_context(
+                logger,
+                "debug",
+                "TV info received",
+                tv_ip=str(settings.tv_ip),
+                response=str(response_data),
+                event_type="tv_info",
+            )
+
+            return response_data
+
+    except httpx.HTTPStatusError as e:
+        raise TVConnectionException(
+            f"HTTP error getting TV info: {e.response.status_code}",
+            details={
+                "tv_ip": str(settings.tv_ip),
+                "error_type": "http_error",
+                "status_code": e.response.status_code,
+            },
+        ) from e
+    except httpx.RequestError as e:
+        raise TVConnectionException(
+            f"Cannot reach TV at {settings.tv_ip}: {e}",
+            details={
+                "tv_ip": str(settings.tv_ip),
+                "error_type": "network_error",
+            },
+        ) from e
