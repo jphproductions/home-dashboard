@@ -340,18 +340,22 @@ start_docker_container() {
     print_info "Waiting for container to start..."
     sleep 5
 
-    # Check container status (including stopped containers)
+    # Check container status - look for running containers
     if docker ps -a &> /dev/null 2>&1; then
-        CONTAINER_CHECK=$(docker ps | grep "home-dashboard" || true)
+        CONTAINER_CHECK=$(docker ps --filter "name=dashboard" --filter "status=running" --format "{{.Names}}" || true)
         CONTAINER_STATUS=$(docker ps -a --filter "name=dashboard" --format "{{.Names}} - {{.Status}}")
     else
-        CONTAINER_CHECK=$(sg docker -c "docker ps" | grep "home-dashboard" || true)
+        CONTAINER_CHECK=$(sg docker -c "docker ps --filter 'name=dashboard' --filter 'status=running' --format '{{.Names}}'" || true)
         CONTAINER_STATUS=$(sg docker -c "docker ps -a --filter 'name=dashboard' --format '{{.Names}} - {{.Status}}'")
     fi
 
     if [ -n "$CONTAINER_CHECK" ]; then
         print_success "Docker container is running"
-        echo "$CONTAINER_CHECK"
+        echo ""
+        print_info "Container status:"
+        echo "$CONTAINER_STATUS"
+        echo ""
+        print_info "Check logs: docker logs -f docker-dashboard-1"
     else
         print_error "Container failed to start or exited"
         echo ""
