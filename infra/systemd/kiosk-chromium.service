@@ -9,7 +9,7 @@ Type=simple
 User=pi
 Environment="DISPLAY=:0"
 Environment="XAUTHORITY=/home/pi/.Xauthority"
-ExecStart=/usr/bin/chromium-browser \
+ExecStart=/usr/bin/chromium \
     --kiosk \
     --noerrdialogs \
     --disable-translate \

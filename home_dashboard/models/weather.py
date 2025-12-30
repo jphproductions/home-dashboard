@@ -75,7 +75,7 @@ class WeatherResponse(BaseModel):
     @property
     def wind_direction_compass(self) -> str:
         """Convert wind direction degrees to compass arrow."""
-        directions = ["↑", "↗", "→", "↘", "↓", "↙", "←", "↖"]
+        directions = ["↓", "↙", "←", "↖", "↑", "↗", "→", "↘"]
         idx = round(self.wind_deg / 45) % 8
         return directions[idx]
 
