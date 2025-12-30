@@ -145,16 +145,24 @@ install_docker() {
         sudo sh /tmp/get-docker.sh
         rm /tmp/get-docker.sh
 
-        print_info "Adding user to docker group..."
-        sudo usermod -aG docker "$USER"
-
         print_success "Docker installed successfully"
     fi
 
+    # Check if user is in docker group
+    if ! groups "$USER" | grep -q docker; then
+        print_info "Adding user to docker group..."
+        sudo usermod -aG docker "$USER"
+        print_success "Docker group added"
+        print_info "Using 'sg docker' to activate group for this script (avoids logout/login)"
+    fi
+
     # Verify Docker Compose
-    if docker compose version &> /dev/null; then
+    if docker compose version &> /dev/null 2>&1; then
         print_success "Docker Compose is available"
         docker compose version
+    elif sg docker -c "docker compose version" &> /dev/null 2>&1; then
+        print_success "Docker Compose is available (via sg docker)"
+        sg docker -c "docker compose version"
     else
         print_error "Docker Compose not found. Please install it manually."
         exit 1
@@ -314,18 +322,38 @@ start_docker_container() {
 
     cd "$REPO_DIR"
 
+    # Check if .env file exists
+    if [ ! -f ".env" ]; then
+        print_error ".env file not found in $REPO_DIR"
+        exit 1
+    fi
+
     print_info "Building and starting Docker container..."
-    docker compose -f docker/docker-compose.yml up -d --build
+    # Use sg docker to activate docker group without sudo side effects
+    if docker ps &> /dev/null 2>&1; then
+        docker compose -f docker/docker-compose.yml up -d --build
+    else
+        print_info "Using 'sg docker' to run with docker group (no sudo needed)"
+        sg docker -c "docker compose -f docker/docker-compose.yml up -d --build"
+    fi
 
     print_info "Waiting for container to be healthy..."
     sleep 5
 
-    if docker ps | grep -q "home-dashboard"; then
+    # Check container status
+    if docker ps &> /dev/null 2>&1; then
+        CONTAINER_CHECK=$(docker ps | grep "home-dashboard" || true)
+    else
+        CONTAINER_CHECK=$(sg docker -c "docker ps" | grep "home-dashboard" || true)
+    fi
+
+    if [ -n "$CONTAINER_CHECK" ]; then
         print_success "Docker container is running"
-        docker ps | grep "home-dashboard"
+        echo "$CONTAINER_CHECK"
     else
         print_error "Failed to start Docker container"
-        print_info "Check logs with: docker logs home-dashboard-dashboard-1"
+        print_info "Check logs with: sg docker -c 'docker logs home-dashboard-dashboard-1'"
+        print_info "Or after logout/login: docker logs home-dashboard-dashboard-1"
         exit 1
     fi
 
