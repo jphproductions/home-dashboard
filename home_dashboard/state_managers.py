@@ -96,15 +96,16 @@ class SpotifyAuthManager(StateManager):
 
 
 class TVStateManager(StateManager):
-    """Manages TV state including wake failure tracking.
+    """Manages TV state including authorization tokens.
 
-    Provides thread-safe tracking of TV wake failures for monitoring
-    and debugging purposes.
+    Provides thread-safe storage of TV authorization tokens to avoid
+    repeated authorization prompts.
     """
 
     def __init__(self):
         """Initialize the TV state manager."""
-        self._wake_failure_count: int = 0
+        self._tv_token: str | None = None  # TV authorization token
+        self._tv_client_id: str | None = None  # TV client ID
         self._lock = asyncio.Lock()
 
     async def initialize(self) -> None:
@@ -114,30 +115,27 @@ class TVStateManager(StateManager):
 
     async def cleanup(self) -> None:
         """Cleanup resources."""
-        # Reset counter on shutdown
+        # Clear tokens on shutdown
         async with self._lock:
-            self._wake_failure_count = 0
+            self._tv_token = None
+            self._tv_client_id = None
 
-    async def get_wake_failure_count(self) -> int:
-        """Get the current wake failure count.
+    async def get_tv_token(self) -> str | None:
+        """Get the stored TV authorization token.
 
         Returns:
-            Number of wake failures
+            TV token or None if not stored
         """
         async with self._lock:
-            return self._wake_failure_count
+            return self._tv_token
 
-    async def increment_wake_failure(self) -> int:
-        """Increment wake failure count.
+    async def set_tv_auth(self, token: str | None, client_id: str | None) -> None:
+        """Store TV authorization token and client ID.
 
-        Returns:
-            Updated failure count
+        Args:
+            token: TV authorization token
+            client_id: TV client ID
         """
         async with self._lock:
-            self._wake_failure_count += 1
-            return self._wake_failure_count
-
-    async def reset_wake_failures(self) -> None:
-        """Reset wake failure count to zero."""
-        async with self._lock:
-            self._wake_failure_count = 0
+            self._tv_token = token
+            self._tv_client_id = client_id

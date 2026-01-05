@@ -1,385 +1,33 @@
-"""Tizen WebSocket service for Samsung TV control."""
+"""Simplified Tizen TV service for Samsung TV control."""
 
 import asyncio
 import base64
 import json
 import ssl
-from collections.abc import AsyncGenerator, Awaitable, Callable
-from contextlib import asynccontextmanager
-from typing import TypeVar
 
 import httpx
 import websockets
-from websockets.exceptions import (
-    ConnectionClosedError,
-    ConnectionClosedOK,
-    InvalidHandshake,
-    InvalidURI,
-)
 
 from home_dashboard.config import Settings, get_settings
 from home_dashboard.exceptions import TVConnectionException
 from home_dashboard.logging_config import get_logger, log_with_context
+from home_dashboard.models.base_models import TVInfo
 from home_dashboard.state_managers import TVStateManager
 
 logger = get_logger(__name__)
 
-# Retry configuration
-MAX_RETRIES = 3
-INITIAL_BACKOFF = 1.0  # seconds
-MAX_BACKOFF = 10.0  # seconds
 
-T = TypeVar("T")
-
-
-async def _retry_with_backoff(
-    operation: Callable[[], Awaitable[T]],
-    operation_name: str,
-    max_retries: int = MAX_RETRIES,
-    initial_backoff: float = INITIAL_BACKOFF,
-) -> T:
-    """Retry an async operation with exponential backoff.
-
-    Args:
-        operation: Async function to retry
-        operation_name: Name for logging
-        max_retries: Maximum number of retry attempts
-        initial_backoff: Initial backoff delay in seconds
-
-    Returns:
-        Result of operation
-
-    Raises:
-        Last exception if all retries exhausted
-    """
-    last_exception = None
-    backoff = initial_backoff
-
-    for attempt in range(max_retries + 1):
-        try:
-            result: T = await operation()
-            return result
-        except (TVConnectionException, OSError, TimeoutError) as e:
-            last_exception = e
-
-            if attempt < max_retries:
-                log_with_context(
-                    logger,
-                    "warning",
-                    f"{operation_name} failed, retrying",
-                    attempt=attempt + 1,
-                    max_retries=max_retries,
-                    backoff=backoff,
-                    error=str(e),
-                    event_type="tv_retry",
-                )
-                await asyncio.sleep(backoff)
-                backoff = min(backoff * 2, MAX_BACKOFF)  # Exponential backoff with cap
-            else:
-                log_with_context(
-                    logger,
-                    "error",
-                    f"{operation_name} failed after all retries",
-                    attempts=max_retries + 1,
-                    error=str(e),
-                    event_type="tv_retry_exhausted",
-                )
-
-    if last_exception:
-        raise last_exception
-    raise TVConnectionException(f"{operation_name} failed with no exception recorded")
-
-
-@asynccontextmanager
-async def _connect_to_tv(settings: Settings) -> AsyncGenerator:
-    """Connect to TV with proper error handling.
-
-    Per websockets 12.0 best practices:
-    - Use async context manager for automatic cleanup
-    - Handle all exception types explicitly
-    - Configure timeouts to prevent hanging
-    - Use proper SSL context for self-signed certs
-
-    Args:
-        settings: Settings instance
-
-    Yields:
-        WebSocket connection
-
-    Raises:
-        TVException: If connection fails
-    """
-    # Base64 encode device name as per Samsung TV API requirements
-    device_name = base64.b64encode(str.encode("HomeDashboard")).decode("utf-8")
-    ws_url = f"wss://{settings.tv_ip}:8002/api/v2/channels/samsung.remote.control?name={device_name}"
-
-    try:
-        async with websockets.connect(
-            ws_url,
-            ssl=ssl.SSLContext(ssl.PROTOCOL_TLS),
-            ping_interval=20,
-            ping_timeout=10,
-            close_timeout=5,
-            open_timeout=10,
-        ) as websocket:
-            # Send handshake
-            handshake = {
-                "method": "ms.channel.connect",
-                "params": {
-                    "sessionId": "",
-                    "clientIp": "",
-                    "deviceName": "HomeDashboard",
-                },
-            }
-            await websocket.send(json.dumps(handshake))
-
-            # Wait for handshake response with timeout
-            try:
-                response = await asyncio.wait_for(websocket.recv(), timeout=5.0)
-                response_data = json.loads(response)
-
-                log_with_context(
-                    logger,
-                    "debug",
-                    "TV handshake response received",
-                    tv_ip=str(settings.tv_ip),
-                    response=str(response),
-                    event_type="tv_handshake",
-                )
-                # Check if TV authorized the connection
-                if response_data.get("event") == "ms.channel.unauthorized":
-                    raise TVConnectionException(
-                        "TV connection unauthorized. Please allow access on the TV.",
-                        details={
-                            "tv_ip": str(settings.tv_ip),
-                            "error_type": "unauthorized",
-                            "hint": "Check TV for authorization prompt",
-                        },
-                    )
-                elif response_data.get("event") != "ms.channel.connect":
-                    raise TVConnectionException(
-                        f"Unexpected handshake response: {response_data.get('event')}",
-                        details={
-                            "tv_ip": str(settings.tv_ip),
-                            "error_type": "unexpected_response",
-                            "response": response_data,
-                        },
-                    )
-            except TimeoutError:
-                raise TVConnectionException(
-                    "TV handshake timeout",
-                    details={"tv_ip": str(settings.tv_ip), "error_type": "handshake_timeout"},
-                ) from None
-
-            yield websocket
-
-    except ConnectionClosedOK:
-        log_with_context(
-            logger,
-            "info",
-            "TV connection closed normally",
-            tv_ip=str(settings.tv_ip),
-            event_type="tv_connection_closed",
-        )
-
-    except ConnectionClosedError as e:
-        raise TVConnectionException(
-            f"TV connection closed with error: {e.code} - {e.reason}",
-            details={
-                "tv_ip": str(settings.tv_ip),
-                "error_type": "connection_closed",
-                "close_code": e.code,
-                "reason": e.reason,
-            },
-        ) from e
-
-    except InvalidURI as e:
-        raise TVConnectionException(
-            f"Invalid TV WebSocket URI: {e}",
-            details={
-                "tv_ip": str(settings.tv_ip),
-                "error_type": "invalid_uri",
-                "uri": ws_url,
-            },
-        ) from e
-
-    except InvalidHandshake as e:
-        raise TVConnectionException(
-            f"TV WebSocket handshake failed: {e}",
-            details={
-                "tv_ip": str(settings.tv_ip),
-                "error_type": "invalid_handshake",
-            },
-        ) from e
-
-    except TimeoutError:
-        raise TVConnectionException(
-            "TV connection timeout",
-            details={
-                "tv_ip": str(settings.tv_ip),
-                "error_type": "connection_timeout",
-                "timeout": "10s",
-            },
-        ) from None
-
-    except OSError as e:
-        raise TVConnectionException(
-            f"Cannot reach TV at {settings.tv_ip}: {e}",
-            details={
-                "tv_ip": str(settings.tv_ip),
-                "error_type": "network_error",
-            },
-        ) from e
-
-
-async def wake(settings: Settings | None = None, tv_manager: TVStateManager | None = None) -> str:
-    """
-    Send KEY_POWER to TV to wake it (toggle power).
-
-    Uses WebSocket to Tizen TV API with proper SSL handling and automatic retries.
-
-    Args:
-        settings: Settings instance (defaults to singleton)
-        tv_manager: TV state manager for failure tracking (optional)
-
-    Returns:
-        Status message.
-
-    Raises:
-        TVConnectionException: If connection fails after all retries.
-    """
-    if settings is None:
-        settings = get_settings()
-
-    async def _send_wake_command() -> str:
-        async with _connect_to_tv(settings) as websocket:
-            # Send KEY_VOLUP for initial authorization testing
-            key_command = {
-                "method": "ms.remote.control",
-                "params": {
-                    "Cmd": "Click",
-                    "DataOfCmd": "KEY_VOLUP",
-                    "Option": "false",
-                    "TypeOfRemote": "SendRemoteKey",
-                },
-            }
-            await websocket.send(json.dumps(key_command))
-
-            log_with_context(
-                logger,
-                "info",
-                "Successfully sent KEY_VOLUP to TV",
-                tv_ip=str(settings.tv_ip),
-                event_type="tv_wake_success",
-            )
-            return "KEY_VOLUP sent to TV"
-
-    try:
-        result: str = await _retry_with_backoff(_send_wake_command, "TV wake command")
-
-        # Reset failure count on success
-        if tv_manager:
-            await tv_manager.reset_wake_failures()
-
-        return result
-
-    except TVConnectionException as e:
-        # Track failure
-        if tv_manager:
-            count = await tv_manager.increment_wake_failure()
-            log_with_context(
-                logger,
-                "warning",
-                "TV wake failed after retries",
-                tv_ip=str(settings.tv_ip),
-                attempt=count,
-                error=e.message,
-                event_type="tv_wake_failure",
-            )
-
-            # Log multiple failures for monitoring
-            if count >= 5:
-                log_with_context(
-                    logger,
-                    "error",
-                    "TV wake failed multiple times",
-                    tv_ip=str(settings.tv_ip),
-                    failure_count=count,
-                    event_type="tv_wake_multiple_failures",
-                )
-        else:
-            log_with_context(
-                logger,
-                "warning",
-                "TV wake failed after retries",
-                tv_ip=str(settings.tv_ip),
-                error=e.message,
-                event_type="tv_wake_failure",
-            )
-
-        raise
-
-
-async def get_status(settings: Settings | None = None) -> bool:
-    """
-    Check if TV is reachable via WebSocket connection.
-
-    Tests TV reachability by attempting WebSocket handshake.
-    If successful, TV is on and accepting connections.
+async def get_info(settings: Settings | None = None) -> TVInfo:
+    """Get TV information via HTTP REST API.
 
     Args:
         settings: Settings instance (defaults to singleton)
 
     Returns:
-        True if TV is reachable (on/standby), False if unreachable (off/network issue).
-    """
-    if settings is None:
-        settings = get_settings()
-
-    try:
-        # Try to connect as a simple reachability test
-        async with _connect_to_tv(settings) as _:
-            # If we successfully connected and got handshake response,
-            # TV is reachable (on or standby)
-            return True
-
-    except TVConnectionException as e:
-        log_with_context(
-            logger,
-            "debug",
-            "TV status check failed",
-            tv_ip=str(settings.tv_ip),
-            error=e.message,
-            event_type="tv_status_check_failed",
-        )
-        return False
-    except Exception as e:
-        log_with_context(
-            logger,
-            "warning",
-            "Unexpected error during TV status check",
-            tv_ip=str(settings.tv_ip),
-            error=str(e),
-            error_type=type(e).__name__,
-            event_type="tv_status_unexpected_error",
-        )
-        return False
-
-
-async def get_info(settings: Settings | None = None) -> dict:
-    """
-    Get TV information via HTTP REST API.
-
-    Makes a GET request to the TV's REST API endpoint.
-
-    Args:
-        settings: Settings instance (defaults to singleton)
-
-    Returns:
-        Dictionary with TV information.
+        TVInfo model with device information
 
     Raises:
-        TVConnectionException: If connection fails.
+        TVConnectionException: If connection fails
     """
     if settings is None:
         settings = get_settings()
@@ -390,18 +38,21 @@ async def get_info(settings: Settings | None = None) -> dict:
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(url)
             response.raise_for_status()
-            response_data = response.json()
+            data = response.json()
+
+            tv_info = TVInfo(**data)
 
             log_with_context(
                 logger,
                 "debug",
                 "TV info received",
                 tv_ip=str(settings.tv_ip),
-                response=str(response_data),
+                power_state=tv_info.device.PowerState,
+                model=tv_info.device.modelName,
                 event_type="tv_info",
             )
 
-            return response_data
+            return tv_info
 
     except httpx.HTTPStatusError as e:
         raise TVConnectionException(
@@ -418,5 +69,277 @@ async def get_info(settings: Settings | None = None) -> dict:
             details={
                 "tv_ip": str(settings.tv_ip),
                 "error_type": "network_error",
+            },
+        ) from e
+
+
+async def _send_key(key: str, settings: Settings, tv_manager: TVStateManager | None = None) -> None:
+    """Send a key command to the TV via WebSocket.
+
+    Args:
+        key: Key code (e.g., 'KEY_POWER', 'KEY_VOLUP')
+        settings: Settings instance
+        tv_manager: TV state manager for token storage (optional)
+
+    Raises:
+        TVConnectionException: If connection fails
+    """
+    # Get stored token if available
+    token = None
+    if tv_manager:
+        token = await tv_manager.get_tv_token()
+
+    # Build WebSocket URL
+    device_name = base64.b64encode(str.encode("HomeDashboard")).decode("utf-8")
+    ws_url = f"wss://{settings.tv_ip}:8002/api/v2/channels/samsung.remote.control?name={device_name}"
+    if token:
+        ws_url += f"&token={token}"
+
+    # SSL context for self-signed cert
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
+
+    try:
+        websocket = await websockets.connect(
+            ws_url,
+            ssl=ssl_context,
+            ping_interval=20,
+            ping_timeout=10,
+            close_timeout=5,
+            open_timeout=10,
+        )
+
+        # Send handshake
+        handshake = {
+            "method": "ms.channel.connect",
+            "params": {
+                "sessionId": "",
+                "clientIp": "",
+                "deviceName": "HomeDashboard",
+            },
+        }
+        await websocket.send(json.dumps(handshake))
+
+        # Wait for authorization with timeout
+        try:
+            timeout_time = asyncio.get_event_loop().time() + 30.0
+            authorized = False
+
+            while asyncio.get_event_loop().time() < timeout_time:
+                try:
+                    response = await asyncio.wait_for(
+                        websocket.recv(), timeout=max(1.0, timeout_time - asyncio.get_event_loop().time())
+                    )
+                    response_data = json.loads(response)
+                    event = response_data.get("event")
+
+                    if event == "ms.channel.connect":
+                        # Store token for future use
+                        if tv_manager:
+                            data = response_data.get("data", {})
+                            auth_token = data.get("token")
+                            client_id = data.get("id")
+                            if auth_token:
+                                await tv_manager.set_tv_auth(auth_token, client_id)
+                                log_with_context(
+                                    logger,
+                                    "info",
+                                    "Stored TV authorization token",
+                                    tv_ip=str(settings.tv_ip),
+                                    event_type="tv_token_stored",
+                                )
+                        authorized = True
+                        break
+                    elif event == "ms.channel.unauthorized":
+                        # Keep waiting for user approval
+                        continue
+
+                except TimeoutError:
+                    break
+
+            if not authorized:
+                await websocket.close()
+                raise TVConnectionException(
+                    "TV connection not authorized - please allow access on TV",
+                    details={
+                        "tv_ip": str(settings.tv_ip),
+                        "error_type": "authorization_timeout",
+                    },
+                )
+
+            # Send key command
+            key_command = {
+                "method": "ms.remote.control",
+                "params": {
+                    "Cmd": "Click",
+                    "DataOfCmd": key,
+                    "Option": "false",
+                    "TypeOfRemote": "SendRemoteKey",
+                },
+            }
+            await websocket.send(json.dumps(key_command))
+
+            log_with_context(
+                logger,
+                "info",
+                f"Sent {key} to TV",
+                tv_ip=str(settings.tv_ip),
+                key=key,
+                used_token=bool(token),
+                event_type="tv_key_sent",
+            )
+
+        finally:
+            await websocket.close()
+
+    except Exception as e:
+        raise TVConnectionException(
+            f"Failed to send key {key} to TV: {e}",
+            details={
+                "tv_ip": str(settings.tv_ip),
+                "error_type": "websocket_error",
+                "key": key,
+            },
+        ) from e
+
+
+async def launch_app(
+    app_id: str,
+    settings: Settings | None = None,
+    tv_manager: TVStateManager | None = None,
+    app_type: str = "DEEP_LINK",
+    meta_tag: str = "",
+) -> None:
+    """Launch an application on the TV via WebSocket.
+
+    Args:
+        app_id: Application ID (e.g., '3201606009684' for Spotify)
+        settings: Settings instance (defaults to singleton)
+        tv_manager: TV state manager for token storage (optional)
+        app_type: Launch type - 'DEEP_LINK' or 'NATIVE_LAUNCH' (default: 'DEEP_LINK')
+        meta_tag: Optional metadata/deep link payload
+
+    Raises:
+        TVConnectionException: If connection fails
+    """
+    if settings is None:
+        settings = get_settings()
+
+    device_name = base64.b64encode(b"home-dashboard").decode("utf-8")
+    token = tv_manager.get_tv_token() if tv_manager else None
+
+    ws_url = f"wss://{settings.tv_ip}:8002/api/v2/channels/samsung.remote.control"
+    if token:
+        ws_url += f"?name={device_name}&token={token}"
+    else:
+        ws_url += f"?name={device_name}"
+
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
+
+    try:
+        async with websockets.connect(ws_url, ssl=ssl_context, close_timeout=2) as websocket:
+            # Wait for authorization response
+            auth_response = await websocket.recv()
+            auth_data = json.loads(auth_response)
+
+            # Extract and store token if present
+            if not token and auth_data.get("data", {}).get("token"):
+                new_token = auth_data["data"]["token"]
+                client_id = auth_data["data"].get("clients", [{}])[0].get("id")
+                if tv_manager:
+                    tv_manager.set_tv_auth(new_token, client_id)
+
+            # Send app launch command
+            launch_command = {
+                "method": "ms.channel.emit",
+                "params": {
+                    "event": "ed.apps.launch",
+                    "to": "host",
+                    "data": {
+                        "action_type": app_type,
+                        "appId": app_id,
+                        "metaTag": meta_tag,
+                    },
+                },
+            }
+            await websocket.send(json.dumps(launch_command))
+
+            log_with_context(
+                logger,
+                "info",
+                f"Launched app {app_id}",
+                tv_ip=str(settings.tv_ip),
+                app_id=app_id,
+                app_type=app_type,
+                used_token=bool(token),
+                event_type="tv_app_launch",
+            )
+
+    except Exception as e:
+        raise TVConnectionException(
+            f"Failed to launch app {app_id}: {e}",
+            details={
+                "tv_ip": str(settings.tv_ip),
+                "error_type": "websocket_error",
+                "app_id": app_id,
+            },
+        ) from e
+
+
+async def wake(settings: Settings | None = None, tv_manager: TVStateManager | None = None) -> str:
+    """Wake the TV if it's in standby.
+
+    Gets the TV power state and sends KEY_POWER only if needed.
+
+    Args:
+        settings: Settings instance (defaults to singleton)
+        tv_manager: TV state manager for token storage (optional)
+
+    Returns:
+        Status message
+
+    Raises:
+        TVConnectionException: If connection fails
+    """
+    if settings is None:
+        settings = get_settings()
+
+    try:
+        # Get TV info to check power state
+        tv_info = await get_info(settings)
+        power_state = tv_info.power_state
+
+        log_with_context(
+            logger,
+            "info",
+            "TV power state checked",
+            tv_ip=str(settings.tv_ip),
+            power_state=power_state,
+            event_type="tv_power_check",
+        )
+
+        if power_state == "standby":
+            # TV is off, send power key
+            await _send_key("KEY_POWER", settings, tv_manager)
+            return "TV was in standby, sent KEY_POWER"
+        elif power_state == "on":
+            # TV is already on
+            return "TV is already on"
+        else:
+            # Unknown state, try to wake anyway
+            await _send_key("KEY_POWER", settings, tv_manager)
+            return f"TV power state unknown ({power_state}), sent KEY_POWER"
+
+    except TVConnectionException:
+        raise
+    except Exception as e:
+        raise TVConnectionException(
+            f"Failed to wake TV: {e}",
+            details={
+                "tv_ip": str(settings.tv_ip),
+                "error_type": "wake_error",
             },
         ) from e

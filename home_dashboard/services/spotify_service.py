@@ -573,3 +573,268 @@ async def play_playlist(
             status_code=status_code,
             details={"operation": "play_playlist"},
         ) from e
+
+
+async def transfer_playback_to_device(
+    client: httpx.AsyncClient,
+    device_id: str,
+    auth_manager: SpotifyAuthManager,
+    settings: Settings | None = None,
+    play: bool = False,
+) -> None:
+    """
+    Transfer Spotify playback to a specific device.
+
+    Args:
+        client: Shared HTTP client from dependency injection.
+        device_id: Spotify device ID to transfer playback to.
+        auth_manager: Spotify authentication state manager
+        settings: Settings instance (defaults to singleton)
+        play: Whether to start playing after transfer (default: False, keeps current play state)
+
+    Raises:
+        SpotifyAPIException: If API call fails.
+    """
+    if settings is None:
+        settings = get_settings()
+
+    log_with_context(
+        logger,
+        "info",
+        "Transferring playback to device",
+        event_type="spotify_transfer_playback",
+        device_id=device_id,
+        auto_play=play,
+    )
+
+    try:
+        token = await _get_access_token(client, auth_manager, settings)
+        response = await client.put(
+            "https://api.spotify.com/v1/me/player",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"device_ids": [device_id], "play": play},
+            timeout=10.0,
+        )
+
+        log_with_context(
+            logger,
+            "debug",
+            "Spotify transfer playback response",
+            event_type="spotify_transfer_response",
+            status_code=response.status_code,
+        )
+
+        response.raise_for_status()
+
+        log_with_context(
+            logger,
+            "info",
+            "Playback transferred successfully",
+            event_type="spotify_transfer_success",
+            device_id=device_id,
+        )
+
+        # Invalidate cache to force fresh status on next request
+        cache_key = "spotify:current_track"
+        cache = get_cache()
+        await cache.clear(cache_key)
+    except httpx.HTTPError as e:
+        status_code = e.response.status_code if hasattr(e, "response") else 502
+        response_text = e.response.text if hasattr(e, "response") else None
+        log_with_context(
+            logger,
+            "error",
+            "Failed to transfer playback",
+            event_type="spotify_transfer_error",
+            status_code=status_code,
+            error=str(e),
+            response_body=response_text,
+        )
+        raise SpotifyAPIException(
+            f"Failed to transfer playback: {str(e)}",
+            status_code=status_code,
+            details={"operation": "transfer_playback", "device_id": device_id},
+        ) from e
+
+
+async def play_playlist_on_device(
+    client: httpx.AsyncClient,
+    playlist_uri: str,
+    device_id: str,
+    auth_manager: SpotifyAuthManager,
+    settings: Settings | None = None,
+) -> None:
+    """
+    Start playing a specific playlist on a specific device.
+
+    Args:
+        client: Shared HTTP client from dependency injection.
+        playlist_uri: Spotify URI of the playlist (spotify:playlist:xxx).
+        device_id: Spotify device ID to play on.
+        auth_manager: Spotify authentication state manager
+        settings: Settings instance (defaults to singleton)
+
+    Raises:
+        SpotifyAPIException: If API call fails.
+    """
+    if settings is None:
+        settings = get_settings()
+
+    log_with_context(
+        logger,
+        "info",
+        "Starting playlist on device",
+        event_type="spotify_play_playlist_on_device",
+        playlist_uri=playlist_uri,
+        device_id=device_id,
+    )
+
+    try:
+        token = await _get_access_token(client, auth_manager, settings)
+        response = await client.put(
+            "https://api.spotify.com/v1/me/player/play",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"device_id": device_id},
+            json={"context_uri": playlist_uri},
+            timeout=10.0,
+        )
+
+        log_with_context(
+            logger,
+            "debug",
+            "Spotify play playlist response",
+            event_type="spotify_play_playlist_response",
+            status_code=response.status_code,
+        )
+
+        response.raise_for_status()
+
+        log_with_context(
+            logger,
+            "info",
+            "Playlist started successfully",
+            event_type="spotify_play_playlist_success",
+            playlist_uri=playlist_uri,
+            device_id=device_id,
+        )
+
+        # Invalidate cache to force fresh status on next request
+        cache_key = "spotify:current_track"
+        cache = get_cache()
+        await cache.clear(cache_key)
+    except httpx.HTTPError as e:
+        status_code = e.response.status_code if hasattr(e, "response") else 502
+        response_text = e.response.text if hasattr(e, "response") else None
+        log_with_context(
+            logger,
+            "error",
+            "Failed to play playlist on device",
+            event_type="spotify_play_playlist_error",
+            status_code=status_code,
+            error=str(e),
+            response_body=response_text,
+        )
+        raise SpotifyAPIException(
+            f"Failed to play playlist on device: {str(e)}",
+            status_code=status_code,
+            details={
+                "operation": "play_playlist_on_device",
+                "playlist_uri": playlist_uri,
+                "device_id": device_id,
+            },
+        ) from e
+
+
+async def wake_tv_launch_spotify_and_play_playlist(
+    client: httpx.AsyncClient,
+    playlist_uri: str,
+    auth_manager: SpotifyAuthManager,
+    tv_service: TVServiceProtocol,
+    tv_manager: "TVStateManager",
+    settings: Settings | None = None,
+) -> str:
+    """
+    Complete workflow: Wake TV, launch Spotify app, transfer playback, and play a playlist.
+
+    This function orchestrates the full experience:
+    1. Wake the TV if it's in standby
+    2. Launch the Spotify app on the TV
+    3. Transfer Spotify playback to the TV device
+    4. Start playing the specified playlist
+
+    Args:
+        client: Shared HTTP client from dependency injection.
+        playlist_uri: Spotify URI of the playlist (spotify:playlist:xxx).
+        auth_manager: Spotify authentication state manager
+        tv_service: TV service protocol implementation
+        tv_manager: TV state manager for WebSocket token
+        settings: Settings instance (defaults to singleton)
+
+    Returns:
+        Success message
+
+    Raises:
+        SpotifyAPIException: If Spotify API calls fail.
+        Exception: If TV operations fail.
+    """
+    if settings is None:
+        settings = get_settings()
+
+    log_with_context(
+        logger,
+        "info",
+        "Starting complete TV + Spotify workflow",
+        event_type="spotify_complete_workflow",
+        playlist_uri=playlist_uri,
+    )
+
+    try:
+        # Step 1: Wake the TV
+        log_with_context(logger, "info", "Step 1: Waking TV", event_type="spotify_workflow_wake_tv")
+        await tv_service.wake(settings, tv_manager)
+        await asyncio.sleep(2)  # Give TV time to wake up
+
+        # Step 2: Launch Spotify app on TV
+        log_with_context(logger, "info", "Step 2: Launching Spotify app", event_type="spotify_workflow_launch_app")
+        await tv_service.launch_app(
+            app_id="3201606009684",  # Spotify app ID
+            settings=settings,
+            tv_manager=tv_manager,
+            app_type="DEEP_LINK",
+        )
+        await asyncio.sleep(3)  # Give app time to launch
+
+        # Step 3: Transfer playback and play playlist
+        log_with_context(
+            logger,
+            "info",
+            "Step 3: Transferring playback and starting playlist",
+            event_type="spotify_workflow_play",
+        )
+        await play_playlist_on_device(
+            client=client,
+            playlist_uri=playlist_uri,
+            device_id=settings.tv_spotify_device_id,
+            auth_manager=auth_manager,
+            settings=settings,
+        )
+
+        log_with_context(
+            logger,
+            "info",
+            "Complete workflow finished successfully",
+            event_type="spotify_workflow_success",
+            playlist_uri=playlist_uri,
+        )
+
+        return f"TV woken, Spotify launched, and playlist started: {playlist_uri}"
+
+    except Exception as e:
+        log_with_context(
+            logger,
+            "error",
+            "Complete workflow failed",
+            event_type="spotify_workflow_error",
+            error=str(e),
+        )
+        raise
